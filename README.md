@@ -22,6 +22,8 @@ The Scanner is a piece of software that analysis the database and gathers
 information from library APIs and updates the books. This software also runs
 scheduled jobs to update stock from the VendusAPI.
 
+![Image](https://github.com/VilMano/livrariaaberta.pt/blob/main/Untitled%20Diagram.jpg?raw=true)
+
 ### <ins>**Prerequisites**</ins>
 To run this project in its fullest, you must install a few things.
  * Docker
