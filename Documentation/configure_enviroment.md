@@ -46,8 +46,9 @@ For the BackOffice we will need the API address and image location.
       "AbertaApi": {
         "BaseUrl": "http://localhost:5002/",
         "ImageUrl": "http://api:5001/Image/",
-	      "Port": "5002"
-      }
+	"ApiKey": ""
+      },
+      "Port": "5002"
     }
 
 ### **Scanner**
