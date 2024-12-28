@@ -1,0 +1,1 @@
+# livrariaaberta.pt
