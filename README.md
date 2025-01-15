@@ -57,5 +57,5 @@ That should be all for the project to be up, just open your browser and check th
 The process will be the same for the Scanner and BackOffice projects.
 Hangfire (Scanner project) can be found at http://localhost:{port}/hangfire and the BackOffice can be reached at http://localhost:{port}.
 
-The documentation of this project can be found [\[here\](https://github.com/VilMano/livrariaaberta.pt/wiki).
+The documentation of this project can be found [\[here\]](https://github.com/VilMano/livrariaaberta.pt/wiki).
 
