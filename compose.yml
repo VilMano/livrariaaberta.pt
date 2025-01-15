@@ -1,0 +1,38 @@
+services:
+  db:
+    image: mysql:9.1
+    container_name: db
+    restart: always
+    environment:
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - ./Aberta.API/db/initdb.d/:/docker-entrypoint-initdb.d/
+    ports:
+      - "${MYSQL_PORT}:3306"
+  api:
+    container_name: api
+    build:
+      context: ./Aberta.API/.
+    ports:
+      - 8080:8080
+    volumes:
+      - ./Aberta.API/wwwroot:/App/wwwroot
+    depends_on:
+      - db
+  scanner:
+    container_name: scanner
+    build:
+      context: ./Aberta.Scanner/.
+    ports:
+      - 8081:8080
+  hangfire:
+    container_name: sql_server
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    ports:
+      - "1433:1433"
+    environment:
+      MSSQL_SA_PASSWORD: "P4sSw0+rd@"
+      ACCEPT_EULA: "Y"
