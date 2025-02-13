@@ -1,36 +1,32 @@
 using System.Net.Http.Headers;
-using System.Text.Json.Serialization;
-using AbertaScanner.Contracts.Services;
-using AbertaScanner.Models;
+using Aberta.Scanner.Models;
+using Aberta.Scanner.Contracts.Services;
 using Newtonsoft.Json;
 using Serilog;
 
-namespace AbertaScanner.Services;
+namespace Aberta.Scanner.Services;
 
-public class VendusService : IVendusService
+public class VendusService(IConfiguration config) : IVendusService
 {
-    private readonly IConfiguration _config;
-
-    public VendusService(IConfiguration config)
-    {
-        _config = config;
-    }
-
     public async Task<ResultWrapper<Book>> GetBook(string isbn) 
     {
-        ResultWrapper<Book> book = new ResultWrapper<Book>();
+        var book = new ResultWrapper<Book>();
 
         try
         {
             Log.Information($"[{isbn}] Retrieving book from OpenLibrary...");
             isbn = Utils.CleanIsbn(isbn);
 
+            var client = new HttpClient();
+            client.BaseAddress = new Uri($"{config.GetValue<string>("AbertaApi:BaseUrl")}vendus?isbn={isbn}");
+            client.DefaultRequestHeaders.Add("X-API-KEY", config.GetValue<string>("AbertaApi:ApiKey"));
+            
             // get book in json format by isbn 
-            HttpResponseMessage request = await Utils.GetAsync($"{_config.GetValue<string>("AbertaApi:BaseUrl")}vendus?isbn={isbn}");
+            var request = await client.GetAsync("");
 
             if (request.IsSuccessStatusCode)
             {
-                string response = request.Content.ReadAsStringAsync().Result;
+                var response = request.Content.ReadAsStringAsync().Result;
                 book.Data = JsonConvert.DeserializeObject<Book>(response);
             }
         }
@@ -45,19 +41,19 @@ public class VendusService : IVendusService
 
     public async Task<ResultWrapper<List<Book>>> GetBatchOfBookStock(int bookCount, int page)
     {
-        ResultWrapper<List<Book>> book = new ResultWrapper<List<Book>>();
+        var book = new ResultWrapper<List<Book>>();
         
         try
         {
             HttpClient client = new HttpClient();
-            client.BaseAddress = new Uri($"{_config.GetValue<string>("AbertaApi:BaseUrl")}vendus/batch");
-            client.DefaultRequestHeaders.Add("X-API-KEY", _config.GetValue<string>("AbertaApi:ApiKey"));
+            client.BaseAddress = new Uri($"{config.GetValue<string>("AbertaApi:BaseUrl")}vendus/batch");
+            client.DefaultRequestHeaders.Add("X-API-KEY", config.GetValue<string>("AbertaApi:ApiKey"));
             
             HttpResponseMessage request = await client.GetAsync($"?numberOfResults={bookCount}&page={page}");
 
             if (request.IsSuccessStatusCode)
             {
-                string response = request.Content.ReadAsStringAsync().Result;
+                var response = await request.Content.ReadAsStringAsync();
                 book = JsonConvert.DeserializeObject<ResultWrapper<List<Book>>>(response);
             }
         }
@@ -77,8 +73,8 @@ public class VendusService : IVendusService
         try
         {
             HttpClient client = new HttpClient();
-            client.BaseAddress = new Uri(_config.GetValue<string>("AbertaApi:BaseUrl"));
-            client.DefaultRequestHeaders.Add("X-API-KEY", _config.GetValue<string>("AbertaApi:ApiKey"));
+            client.BaseAddress = new Uri(config.GetValue<string>("AbertaApi:BaseUrl"));
+            client.DefaultRequestHeaders.Add("X-API-KEY", config.GetValue<string>("AbertaApi:ApiKey"));
                         
             client.DefaultRequestHeaders.Accept.Add(
                 new MediaTypeWithQualityHeaderValue("application/json"));

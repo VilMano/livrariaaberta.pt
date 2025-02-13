@@ -1,7 +1,7 @@
 
 using Newtonsoft.Json;
 
-namespace AbertaScanner.Models;
+namespace Aberta.Scanner.Models;
 
 public class Product {
     public string? Reference { get; set; }

@@ -1,22 +1,22 @@
-using AbertaScanner.Contracts.Services.Libraries;
-using AbertaScanner.Models;
+using Aberta.Scanner.Contracts.Services.Libraries;
+using Aberta.Scanner.Models;
 using Newtonsoft.Json;
 using Serilog;
 
-namespace AbertaScanner.Services.Libraries;
+namespace Aberta.Scanner.Services.Libraries;
 
-public class OpenLibraryService : IOpenLibraryService
+public class OpenLibraryService(IConfiguration config) : IOpenLibraryService
 {
-    private readonly IConfiguration _configuration;
-
-    public OpenLibraryService(IConfiguration config)
-    {
-        _configuration = config;
-    }
-
     public async Task<Book> GetBook(string isbn)
     {
-        Book book = new Book();
+        var book = new Book()
+        {
+            Title = "",
+            Author = "",
+            Price = 0,
+            Stock = 0,
+            IsActive = false,
+        };
 
         try
         {
@@ -25,23 +25,23 @@ public class OpenLibraryService : IOpenLibraryService
             isbn = Utils.CleanIsbn(isbn);
 
 
-            HttpClient client = new HttpClient();
-            client.BaseAddress = new Uri($"{_configuration.GetValue<string>("AbertaApi:BaseUrl")}ol");
+            var client = new HttpClient();
+            client.BaseAddress = new Uri($"{config.GetValue<string>("AbertaApi:BaseUrl")}ol");
 
-            HttpResponseMessage request = await HttpRequests.GetAsync(client, $"?isbn={isbn}");
+            var request = await client.GetAsync($"?isbn={isbn}");
 
             if (request.IsSuccessStatusCode)
             {
-                string bookJson = request.Content.ReadAsStringAsync().Result;
-                book = JsonConvert.DeserializeObject<Book>(bookJson);
-
-                return book;
+                var bookJson = await request.Content.ReadAsStringAsync();
+                var bookWrap = JsonConvert.DeserializeObject<ResultWrapper<Book>>(bookJson);
+                book = bookWrap.Data;
             }
             else
             {
                 Log.Information($"[{isbn}] Could not retrieve book. {request.StatusCode}");
-                return book;
             }
+
+            return book;
         }
         catch (Exception e)
         {

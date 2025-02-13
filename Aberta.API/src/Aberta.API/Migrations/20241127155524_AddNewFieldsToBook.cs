@@ -14963,7 +14963,7 @@ namespace AbertaAPI.Migrations
                 keyValue: "tiagojimbicolour");
 
             migrationBuilder.AddColumn<bool>(
-                name: "isActive",
+                name: "IsActive",
                 table: "Books",
                 type: "tinyint(1)",
                 nullable: false,
@@ -14974,7 +14974,7 @@ namespace AbertaAPI.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "isActive",
+                name: "IsActive",
                 table: "Books");
 
             migrationBuilder.InsertData(

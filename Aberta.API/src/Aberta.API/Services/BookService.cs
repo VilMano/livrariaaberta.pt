@@ -1,68 +1,52 @@
 using AbertaApi.Contracts.Repositories;
 using AbertaApi.Contracts.Services;
-using AbertaApi.Models;
 using AbertaApi.Contracts.Services.Libraries;
-using Newtonsoft.Json;
+using AbertaApi.Models;
 using Serilog;
+using ILogger = Microsoft.Extensions.Logging.ILogger;
 
-namespace AbertaApi.Services;
+namespace Aberta.API.Services;
 
-public class BookService(IBookRepository repo, ITagService tagService, IBnpLibraryService bnpService, IOpenLibraryService olService)
-    : IBookService
+public class BookService(
+    IBookRepository repo,
+    ITagService tagService,
+    IBnpLibraryService bnpService,
+    IOpenLibraryService olService,
+    ILogger<BookService> logger) : IBookService
 {
     #region CRUD
 
     public async Task<ResultWrapper<Book>> UpdateBook(Book book)
     {
-        ResultWrapper<Book> result = new ResultWrapper<Book>();
-        
-        List<string> errors = ValidateBook(book);
+        var result = new ResultWrapper<Book>();
 
-        if (errors.Count != 0)
+        logger.LogInformation("Validating book to update.");
+
+        var errors = ValidateBook(book);
+        if (errors.Count > 0)
         {
-            result.Errors = errors;
-            result.IsSuccessful = false;
+            result.Errors.AddRange(errors);
             return result;
         }
-        
-        ResultWrapper<Book> fetchedBook = repo.GetBook(book.Isbn);
 
-        if (fetchedBook.Data == null)
+        if (book.Isbn == null) return result;
+        var fetchedBook = repo.GetBook(book.Isbn);
+
+        if (fetchedBook.IsSuccessful)
+        {
+            fetchedBook.Data = UpdateBook(book, fetchedBook.Data);
+            if (book.TagsList != null)
+                if (fetchedBook.Data.TagsList != null)
+                    fetchedBook.Data.TagsList = UpdateTags(book.TagsList, fetchedBook.Data.TagsList);
+
+            result = await repo.UpdateBook(fetchedBook.Data);
+
+            if (!result.IsSuccessful) return result;
+            result.IsSuccessful = true;
+        }
+        else
         {
             result.Errors.Add("The book was not found.");
-            result.IsSuccessful = false;
-            return result;
-        }
-
-        try
-        {
-            List<Tag> newTagList = [];
-            foreach(Tag tag in book.TagsList){
-                Tag currentTag = tagService.GetActiveTags(tag.Name).Data.FirstOrDefault();
-
-                if(currentTag != null)
-                {
-                    var tags = newTagList.Where(t => t.Name.ToLowerInvariant() == currentTag.Name.ToLowerInvariant()).ToList();
-                    if(tags.Count() == 0)
-                        newTagList.Add(currentTag);
-                }else{
-                    ResultWrapper<Tag> newTagRes = await tagService.CreateTag(tag);
-                    Tag newTag = new Tag{
-                        Id = newTagRes.Data.Id,
-                        Name = newTagRes.Data.Name
-                    };
-                    newTagList.Add(newTag);
-                }
-            }
-
-            book.TagsList = newTagList;
-
-            result = await repo.UpdateBook(book);
-        }
-        catch (Exception e)
-        {
-            result.Errors.Add("Something went wrong.");
-            Log.Error(e.Message);
         }
 
         return result;
@@ -70,105 +54,109 @@ public class BookService(IBookRepository repo, ITagService tagService, IBnpLibra
 
     public async Task<ResultWrapper<Book>> CreateBook(Book book)
     {
-        ResultWrapper<Book> result = new ResultWrapper<Book>();
+        var result = new ResultWrapper<Book>();
 
         try
         {
-            List<string> errors = ValidateBook(book);
+            logger.LogInformation("Validating book to create.");
 
-            if (errors.Any())
+            var errors = ValidateBook(book);
+
+            if (errors.Count > 0)
             {
                 result.IsSuccessful = false;
                 result.Errors = errors;
                 return result;
             }
 
-            ResultWrapper<Book> fetchedBook = repo.GetBook(book.Isbn);
+            if (book.Isbn == null) return result;
 
-            if (fetchedBook.Data == null)
+            var fetchedBook = repo.GetBook(book.Isbn);
+
+            if (!fetchedBook.IsSuccessful)
             {
                 result = await repo.CreateBook(book);
             }
             else
             {
-                result.IsSuccessful = false;
                 result.Errors.Add("The book already exists.");
-                return result;
             }
+
+            return result;
         }
         catch (Exception e)
         {
             result.Errors.Add("Something went wrong.");
-            Log.Error(e.Message);
+            logger.LogError(e.Message, e);
+            return result;
         }
-
-        return result;
     }
 
     public ResultWrapper<Book> GetBook(string isbn)
     {
-        ResultWrapper<Book> result = new ResultWrapper<Book>();
+        var result = new ResultWrapper<Book>();
 
         try
         {
             result = repo.GetBook(isbn);
-
-            if (result.IsSuccessful)
-            {
-                return result;
-            }
         }
         catch (Exception e)
         {
             result.Errors.Add("Something went wrong.");
-            Log.Error(e.Message);
+            logger.LogError(e.Message, e);
+            return result;
         }
 
         return result;
     }
 
     // orderQuery = "desc/asc,alpha/price/date"
-    public ResultWrapper<BookResults> GetBooks(int numberOfRecords, int page, string orderQuery = "desc,alpha")
+    public ResultWrapper<BookResults> GetBooks(BookSearch search)
     {
-        ResultWrapper<BookResults> result = new ResultWrapper<BookResults>();
+        var result = new ResultWrapper<BookResults>();
 
-        int skip = (page - 1) * numberOfRecords;
+        var skip = (search.Page - 1) * search.NumberOfResults;
+
+        Order orderResults;
+        var isDescending = search.SortOrder == "desc";
+
+        switch (search.SortBy)
+        {
+            case "price":
+                orderResults = Order.Price;
+                break;
+            case "date":
+                orderResults = Order.Date;
+                break;
+            default:
+                orderResults = Order.Alphabetical;
+                break;
+        }
 
         try
         {
-            Order orderResults = Order.Alphabetical;
-            bool isDescending = orderQuery.Split(',')[0] == "desc";
+            var books = repo.GetActiveBooks(search.NumberOfResults, skip, isDescending, orderResults);
+            var totalBookCount = repo.GetActiveBooks(100000, 0);
 
-            switch (orderQuery.Split(',')[1])
+            if (books.IsSuccessful)
             {
-                case "price":
-                    orderResults = Order.Price;
-                    break;
-                case "date":
-                    orderResults = Order.Date;
-                    break;
-            }
+                result.Data = new BookResults
+                {
+                    results = books.Data,
+                    AmountOfResults = totalBookCount.Data.Count,
+                    CurrentPage = search.Page,
+                    TotalPages = totalBookCount.Data.Count / search.NumberOfResults
+                };
 
-            ResultWrapper<List<Book>> books =
-                repo.GetBooks(b => b.isActive, numberOfRecords, skip, isDescending, orderResults);
-            ResultWrapper<List<Book>> totalBookCount = repo.GetBooks(book => book.isActive, 100000, 0);
-
-            result.Data = new BookResults();
-            result.Data.results = books.Data;
-            result.Data.AmmountOfResults = totalBookCount.Data.Count;
-            result.Data.CurrentPage = page;
-            result.Data.TotalPages = totalBookCount.Data.Count / numberOfRecords;
-            result.IsSuccessful = true;
-
-            if (result.IsSuccessful)
-            {
+                result.IsSuccessful = true;
                 return result;
             }
         }
         catch (Exception e)
         {
-            Log.Error(e.Message);
+            logger.LogError(e.Message, e);
             result.Errors.Add("Something went wrong.");
+            return result;
         }
 
         return result;
@@ -176,20 +164,22 @@ public class BookService(IBookRepository repo, ITagService tagService, IBnpLibra
 
     public async Task<ResultWrapper<Book>> DeleteBook(string isbn)
     {
-        ResultWrapper<Book> result = new ResultWrapper<Book>();
+        var result = new ResultWrapper<Book>();
+
         try
         {
-            ResultWrapper<Book> booksToDelete = repo.GetBook(isbn);
-            Book bookToDelete = booksToDelete.Data;
+            var booksToDelete = repo.GetBook(isbn);
+            var bookToDelete = booksToDelete.Data;
 
-            if (bookToDelete != null && !string.IsNullOrEmpty(bookToDelete.Isbn))
+            if (booksToDelete.IsSuccessful)
             {
                 await repo.DeleteBook(bookToDelete);
+                result.IsSuccessful = true;
             }
         }
         catch (Exception e)
         {
-            Log.Error(e.Message);
+            logger.LogError(e.Message, e);
             result.Errors.Add("Something went wrong.");
         }
 
@@ -198,59 +188,80 @@ public class BookService(IBookRepository repo, ITagService tagService, IBnpLibra
 
     #endregion
 
-    public async Task<ResultWrapper<BookResults>> SearchBooksByTitleAndOtherAttributes(string attributes,
-        int numberOfRecords = 50, int page = 1)
+    public ResultWrapper<BookResults> SearchBooksByTitleAndOtherAttributes(BookSearch search, bool isActive)
     {
-        ResultWrapper<BookResults> books = new ResultWrapper<BookResults>();
+        var books = new ResultWrapper<BookResults>();
 
         try
         {
-            List<Book> booksList = new List<Book>();
+            List<Book> booksList = [];
 
-            // start retrieving values from the database
-            var booksByTitle = repo.GetBooks(book => Utils.StringContains(book.Title, attributes), 10000, 0);
-            var booksByAuthor =
-                repo.GetBooks(book => book.Author != null && Utils.StringContains(book.Author, attributes), 10000, 0);
-            var booksByIsbn = repo.GetBooks(book => Utils.StringContains(book.Isbn, attributes), 10000, 0);
+            logger.LogInformation("Searching books...");
 
-            if (booksByTitle.Data is { Count: > 0 })
-                booksList.AddRange(booksByTitle.Data);
+            var booksByTitle = repo.GetBooksByTitle(search.SearchTerm);
+            booksByTitle.Data = booksByTitle.Data.Where(book => book.IsActive == isActive).ToList();
 
-            if (booksByAuthor.Data is { Count: > 0 })
-                booksList.AddRange(booksByAuthor.Data);
+            if (search.SearchTerm == "")
+            {
+                booksList = booksByTitle.Data;
+            }
+            else
+            {
+                var booksByAuthor = repo.GetBooksByAuthor(search.SearchTerm);
+                var booksByIsbn = repo.GetBooksByIsbn(search.SearchTerm);
 
-            if (booksByIsbn.Data is { Count: > 0 })
-                booksList.AddRange(booksByIsbn.Data);
+                booksByAuthor.Data = booksByAuthor.Data.Where(book => book.IsActive == isActive).ToList();
+                booksByIsbn.Data = booksByIsbn.Data.Where(book => book.IsActive == isActive).ToList();
+
+                var tmpList = 
+                    new List<List<Book>>([booksByTitle.Data, booksByAuthor.Data, booksByIsbn.Data])
+                        .OrderByDescending(lists => lists.Count).ToList();
+                
+                booksList.AddRange(tmpList[0].Concat(tmpList[1].Concat(tmpList[2])));
+            }
+
+            if (search.Tags is { Count: > 0 })
+            {
+                booksList = booksList.Where(book =>
+                        book.TagsList != null && book.TagsList
+                            .Any(tagInBook => search.Tags.Contains(tagInBook.Name)))
+                    .ToList();
+            }
 
             if (booksList is { Count: > 0 })
             {
                 books.IsSuccessful = true;
 
-                BookResults BookResults = new BookResults();
-                BookResults.results = booksList.Skip((page - 1) * numberOfRecords).Take(numberOfRecords).ToList();
-                BookResults.AmmountOfResults = booksList.Count;
-                BookResults.TotalPages = (booksList.Count / numberOfRecords) + 1;
-                BookResults.CurrentPage = page;
+                var bookResults = new BookResults
+                {
+                    results = booksList
+                        .Skip((search.Page - 1) * search.NumberOfResults)
+                        .Take(search.NumberOfResults)
+                        .ToList(),
+                    AmountOfResults = booksList.Count,
+                    TotalPages = (booksList.Count / search.NumberOfResults) + 1,
+                    CurrentPage = search.Page
+                };
 
-                books.Data = BookResults;
+                books.Data = bookResults;
             }
         }
         catch (Exception e)
         {
             books.Errors.Add("Something went wrong.");
-            Log.Error(e.Message);
+            logger.LogError(e.Message);
         }
 
         return books;
     }
 
-    public async Task<ResultWrapper<Book>> GetLibrarBook(string isbn, ApiService api)
+    public async Task<ResultWrapper<Book>> GetLibraryBook(string isbn, ApiService library)
     {
-        ResultWrapper<Book> book = new ResultWrapper<Book>();
+        var book = new ResultWrapper<Book>();
 
         try
         {
-            switch (api)
+            switch (library)
             {
                 case ApiService.OpenLibrary:
                     book = await olService.GetBook(isbn);
@@ -260,44 +271,101 @@ public class BookService(IBookRepository repo, ITagService tagService, IBnpLibra
                     break;
             }
 
-            if (book.Data != null)
-                book.IsSuccessful = true;
+            book.IsSuccessful = true;
         }
         catch (Exception e)
         {
             book.Errors.Add("Something went wrong.");
-            Log.Error(e.Message);
+            logger.LogError(e.Message, e);
         }
 
         return book;
     }
 
-    public List<string> ValidateBook(Book book)
+    private static List<string> ValidateBook(Book book)
     {
         List<string> errors = [];
 
-        if (book != null)
+        if (book.Isbn == null || string.IsNullOrEmpty(book.Isbn))
         {
-            if (book.Isbn == null || string.IsNullOrEmpty(book.Isbn))
-            {
-                errors.Add("ISBN is required.");
-            }
-
-            if (book.Title == null || string.IsNullOrEmpty(book.Title))
-            {
-                errors.Add("Title is required.");
-            }
-
-            if (book.Author == null || string.IsNullOrEmpty(book.Author))
-            {
-                errors.Add("Author is required.");
-            }
+            errors.Add("ISBN is required.");
         }
-        else
+
+        if (book.Title == null || string.IsNullOrEmpty(book.Title))
         {
-            errors.Add("Book object is required.");
+            errors.Add("Title is required.");
+        }
+
+        if (book.Author == null || string.IsNullOrEmpty(book.Author))
+        {
+            errors.Add("Author is required.");
         }
 
         return errors;
+    }
+
+    private static Book UpdateBook(Book newBook, Book bookToUpdate)
+    {
+        if (!string.IsNullOrEmpty(newBook.Title))
+            bookToUpdate.Title = newBook.Title;
+
+        if (!string.IsNullOrEmpty(newBook.Synopsis))
+            bookToUpdate.Synopsis = newBook.Synopsis;
+
+        if (!string.IsNullOrEmpty(newBook.Author))
+            bookToUpdate.Author = newBook.Author;
+
+        if (!string.IsNullOrEmpty(newBook.Publisher))
+            bookToUpdate.Publisher = newBook.Publisher;
+
+        if (!string.IsNullOrEmpty(newBook.Language))
+            bookToUpdate.Language = newBook.Language;
+
+        if (!string.IsNullOrEmpty(newBook.Translator))
+            bookToUpdate.Translator = newBook.Translator;
+        
+        if (!string.IsNullOrEmpty(newBook.ReleaseDate))
+            bookToUpdate.ReleaseDate = newBook.ReleaseDate;
+        
+        if (!string.IsNullOrEmpty(newBook.CoverPicture))
+            bookToUpdate.CoverPicture = newBook.CoverPicture;
+
+        bookToUpdate.IsActive = newBook.IsActive;
+
+        bookToUpdate.Price = newBook.Price;
+
+        bookToUpdate.Stock = newBook.Stock;
+
+
+        return bookToUpdate;
+    }
+
+    private List<Tag> UpdateTags(List<Tag> newTags, List<Tag> tagsToUpdate)
+    {
+        #region REMOVE TAGS THAT WERE DELETE
+
+        var tagsToRemove = tagsToUpdate.Where(tag =>
+            newTags.All(t => !t.Name.Equals(tag.Name, StringComparison.CurrentCultureIgnoreCase))).ToList();
+
+        foreach (var tagToRemove in tagsToRemove)
+        {
+            tagsToUpdate.Remove(tagToRemove);
+        }
+
+        #endregion
+
+        foreach (var newTag in newTags)
+        {
+            var tagsInBook =
+                tagsToUpdate.Where(t => t.Name.Equals(newTag.Name, StringComparison.CurrentCultureIgnoreCase));
+
+            if (tagsInBook.Any()) continue;
+
+            var tagInDb = tagService.GetActiveTags(newTag.Name);
+
+            tagsToUpdate.Add(tagInDb is { IsSuccessful: true, Data.Count: > 0 } ? tagInDb.Data.First() : newTag);
+        }
+
+        return tagsToUpdate;
     }
 }

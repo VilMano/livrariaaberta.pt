@@ -1,6 +1,10 @@
-using AbertaApi.Models;
-using AbertaApi.Repositories;
+using Aberta.API.Repositories;
+using Aberta.Tests.Content;
+using AbertaApi.Data;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 
 namespace Aberta.Tests;
@@ -8,205 +12,175 @@ namespace Aberta.Tests;
 public class RepositoryTests
 {
     private readonly IConfiguration _configuration;
+    private readonly BookRepository _bookRepository;
+
     public RepositoryTests()
     {
         _configuration = Substitute.For<IConfiguration>();
         _configuration.GetConnectionString("Database")
             .Returns("Host=localhost;Port=3308;Database=AbertaTest;Username=root;Password=P4sSw0+rd@");
+
+        var serviceProvider = new ServiceCollection()
+            .AddLogging()
+            .BuildServiceProvider();
+        var factory = serviceProvider.GetService<ILoggerFactory>();
+        var logger = factory.CreateLogger<BookRepository>();
+        
+        _bookRepository = new BookRepository(_configuration, logger);
     }
-    
-    [Fact]
-    public async Task InsertTest()
+
+    [Theory]
+    [InlineData("9780008637569")]
+    [InlineData("9789720046673")]
+    public async Task InsertValidBooks(string isbn)
     {
-        BookRepository repository = new BookRepository(_configuration);
+        var actualBook = Books.GetBooks().FirstOrDefault(book => book.Isbn == isbn);
 
-        Book actualBook = new Book
-        {
-            Id = "1",
-            Isbn = "9789720046673",
-            Title = "As intermitências da morte",
-            Stock = 0,
-            Publisher = "Porto Editora",
-            CoverPicture = "",
-            Synopsis = "",
-            Price = 0,
-            Author = "José Saramago",
-            Language = "Português",
-            ReleaseDate = "2014-01-01"
-        };
+        var result = await _bookRepository.CreateBook(actualBook);
 
-        await repository.CreateBook(actualBook);
-        ResultWrapper<Book> book = repository.GetBook("9789720046673");
-
-        if (book != null)
-            await repository.DeleteBook(book.Data);
-        else
-            Assert.Fail("That didnt go well");
-
-        ResultWrapper<Book> newBook = repository.GetBook("9789720046673");
-
-        Assert.True(!newBook.IsSuccessful);
+        Assert.True(result.IsSuccessful);
+        await CleanUp();
     }
 
     [Fact]
     public async Task GetBookTest()
     {
-        BookRepository repository = new BookRepository(_configuration);
+        var actualBook = Books.GetBooks()[0];
 
-        Book actualBook = new Book
-        {
-            Id = "1",
-            Isbn = "9789720046673",
-            Title = "As intermitências da morte",
-            Stock = 0,
-            Publisher = "Porto Editora",
-            CoverPicture = "",
-            Synopsis = "",
-            Price = 0,
-            Author = "José Saramago",
-            Language = "Português",
-            ReleaseDate = "2014-01-01"
-        };
+        await _bookRepository.CreateBook(actualBook);
+        var book = _bookRepository.GetBook(actualBook.Isbn);
 
-        await repository.CreateBook(actualBook);
-        ResultWrapper<Book> book = repository.GetBook("9789720046673");
-
-        if (book != null)
-            await repository.DeleteBook(book.Data);
-        else
-            Assert.Fail("That didnt go well");
-
-        Assert.True(book.Data != null);
+        Assert.True(book.IsSuccessful);
+        
+        await CleanUp();
     }
 
     [Fact]
     public async Task DeleteTest()
     {
-        BookRepository repository = new BookRepository(_configuration);
+        var actualBook = Books.GetBooks()[0];
 
-        Book actualBook = new Book
-        {
-            Id = "1",
-            Isbn = "9789720046673",
-            Title = "As intermitências da morte",
-            Stock = 0,
-            Publisher = "Porto Editora",
-            CoverPicture = "",
-            Synopsis = "",
-            Price = 0,
-            Author = "José Saramago",
-            Language = "Português",
-            ReleaseDate = "2014-01-01"
-        };
+        await _bookRepository.CreateBook(actualBook);
+        var result = await _bookRepository.DeleteBook(actualBook);
 
-        await repository.CreateBook(actualBook);
-        ResultWrapper<Book> book = repository.GetBook("9789720046673");
-        await repository.DeleteBook(book.Data);
-        ResultWrapper<Book> bookDelete = repository.GetBook("9789720046673");
-
-        Assert.True(bookDelete.Data == null);
+        Assert.True(result.IsSuccessful);
+        
+        await CleanUp();
     }
 
     [Fact]
     public async Task UpdateTest()
     {
-        BookRepository repository = new BookRepository(_configuration);
+        var actualBook = Books.GetBooks()[0];
+        var updatedBook = Books.GetUpdatedBooks()[0];
 
-        Book actualBook = new Book
+        await _bookRepository.CreateBook(actualBook);
+        var book = _bookRepository.GetBook(actualBook.Isbn);
+        
+        book.Data.Price = updatedBook.Price;
+        book.Data.Publisher = updatedBook.Publisher;
+        book.Data.Author = updatedBook.Author;
+        book.Data.Stock = updatedBook.Stock;
+
+        if (book.IsSuccessful)
         {
-            Id = "1",
-            Isbn = "9789720046673",
-            Title = "As intermitências da morte",
-            Stock = 0,
-            Publisher = "Porto Editora",
-            CoverPicture = "",
-            Synopsis = "",
-            Price = 0,
-            Author = "José Saramago",
-            Language = "Português",
-            ReleaseDate = "2014-01-01"
-        };
-
-        await repository.CreateBook(actualBook);
-        ResultWrapper<Book> book = repository.GetBook("9789720046673");
-
-        if (book.Data != null)
-        {
-            book.Data.Title = "test";
-            await repository.UpdateBook(book.Data);
-            ResultWrapper<Book> updatedBook = repository.GetBook("9789720046673");
-            Assert.True(updatedBook.Data.Title == "test");
-            
-            await repository.DeleteBook(updatedBook.Data);
+            var result = await _bookRepository.UpdateBook(book.Data);
+            Assert.True(result.IsSuccessful);
         }
         else
         {
-            Assert.Fail("The book was null");
+            Assert.Fail("The book was not found.");
         }
+        
+        await CleanUp();
     }
 
-    [Fact]
-    public async void GetBooksTest()
+    [Theory]
+    [InlineData("morte")]
+    public async Task GetBooksByTitle(string textInput)
     {
-        BookRepository repository = new BookRepository(_configuration);
-
-        Book actualBook = new Book
-        {
-            Id = "9789720046673",
-            Isbn = "9789720046673",
-            Title = "As intermitências da morte",
-            Stock = 0,
-            Publisher = "Porto Editora",
-            CoverPicture = "",
-            Synopsis = "",
-            Price = 0,
-            Author = "José Saramago",
-            Language = "Português",
-            ReleaseDate = "2014-01-01"
-        };
-        
-        Book diffBook = new Book
-        {
-            Id = "000000000001",
-            Isbn = "000000000001",
-            Title = "Fantasias",
-            Stock = 0,
-            Publisher = "Porto Editora",
-            CoverPicture = "",
-            Synopsis = "",
-            Price = 0,
-            Author = "Test author",
-            Language = "Português",
-            ReleaseDate = "1980-01-01"
-        };
-
-        List<Book> bookData = new List<Book>() { diffBook, actualBook };
+        string text = textInput.ToLower();
+        var bookData = Books.GetBooks().Where(book => book.Title.ToLower().Contains(text));
 
         foreach (var book in bookData)
         {
-            await repository.CreateBook(book);
+            await _bookRepository.CreateBook(book);
         }
 
-        ResultWrapper<List<Book>> books = repository.GetBooks(b => b.Title.Contains("morte"), 20, 0);
+        var books = _bookRepository.GetBooksByTitle(text);
 
-        if (books.Data is not { Count: > 0 })
+        if (!books.IsSuccessful)
         {
             Assert.Fail();
             return;
         }
 
+        var retrievedBooksCount = books.Data.Count;
+        var bookCountWithTitleKeyword = Books.GetBooks().Count(book => book.Title.ToLower().Contains(text));
+        Assert.True(retrievedBooksCount == bookCountWithTitleKeyword);
+        
+        await CleanUp();
+    }
+    
+    [Theory]
+    [InlineData("Sara")]
+    [InlineData("Michae")]
+    public async Task GetBooksByAuthor(string textInput)
+    {
+        string text = textInput.ToLower();
+        var bookData = Books.GetBooks().Where(book => book.Author.ToLower().Contains(text));
+
         foreach (var book in bookData)
         {
-            await repository.DeleteBook(book);
+            await _bookRepository.CreateBook(book);
         }
 
-        bool isResultCorrect = true;
-        foreach (var book in books.Data)
+        var books = _bookRepository.GetBooksByAuthor(text);
+
+        if (!books.IsSuccessful)
         {
-            if (!book.Title.Contains("morte") && !book.Author.Contains("morte") && !book.Isbn.Contains("morte"))
-                isResultCorrect = false;
+            Assert.Fail();
+            return;
         }
 
-        Assert.True(isResultCorrect);
+        var retrievedBooksCount = books.Data.Count;
+        var bookCountWithTitleKeyword = Books.GetBooks().Count(book => book.Author.ToLower().Contains(text));
+        Assert.True(retrievedBooksCount == bookCountWithTitleKeyword);
+        
+        await CleanUp();
+    }
+    
+    [Theory]
+    [InlineData("9780008637569")]
+    public async Task GetBooksByIsbn(string textInput)
+    {
+        string text = textInput.ToLower();
+        var bookData = Books.GetBooks().Where(book => book.Isbn.ToLower().Contains(text));
+
+        foreach (var book in bookData)
+        {
+            await _bookRepository.CreateBook(book);
+        }
+
+        var books = _bookRepository.GetBooksByIsbn(text);
+
+        if (!books.IsSuccessful)
+        {
+            Assert.Fail();
+            return;
+        }
+
+        var retrievedBooksCount = books.Data.Count;
+        var bookCountWithTitleKeyword = Books.GetBooks().Count(book => book.Isbn.ToLower().Contains(text));
+        Assert.True(retrievedBooksCount == bookCountWithTitleKeyword);
+        
+        await CleanUp();
+    }
+
+    private async Task CleanUp()
+    {
+        var ctx = new Context(_configuration.GetConnectionString("Database"));
+        await ctx.Books.ExecuteDeleteAsync();
+        await ctx.SaveChangesAsync();
     }
 }

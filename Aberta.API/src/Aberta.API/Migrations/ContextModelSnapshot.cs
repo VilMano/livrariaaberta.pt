@@ -32,6 +32,9 @@ namespace AbertaAPI.Migrations
                     b.Property<string>("CoverPicture")
                         .HasColumnType("longtext");
 
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<string>("Isbn")
                         .HasColumnType("longtext");
 
@@ -56,12 +59,12 @@ namespace AbertaAPI.Migrations
                     b.Property<string>("Title")
                         .HasColumnType("longtext");
 
-                    b.Property<bool>("isActive")
-                        .HasColumnType("tinyint(1)");
+                    b.Property<string>("Translator")
+                        .HasColumnType("longtext");
 
                     b.HasKey("Id");
 
-                    b.ToTable("Books", (string)null);
+                    b.ToTable("Books");
                 });
 
             modelBuilder.Entity("AbertaApi.Models.Tag", b =>
@@ -72,9 +75,6 @@ namespace AbertaAPI.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("BookId")
-                        .HasColumnType("varchar(255)");
-
                     b.Property<bool>("IsActive")
                         .HasColumnType("tinyint(1)");
 
@@ -84,21 +84,37 @@ namespace AbertaAPI.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BookId");
-
-                    b.ToTable("Tags", (string)null);
+                    b.ToTable("Tags");
                 });
 
-            modelBuilder.Entity("AbertaApi.Models.Tag", b =>
+            modelBuilder.Entity("BookTag", b =>
+                {
+                    b.Property<string>("BooksId")
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<int>("TagsListId")
+                        .HasColumnType("int");
+
+                    b.HasKey("BooksId", "TagsListId");
+
+                    b.HasIndex("TagsListId");
+
+                    b.ToTable("BookTag");
+                });
+
+            modelBuilder.Entity("BookTag", b =>
                 {
                     b.HasOne("AbertaApi.Models.Book", null)
-                        .WithMany("Tags")
-                        .HasForeignKey("BookId");
-                });
+                        .WithMany()
+                        .HasForeignKey("BooksId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
-            modelBuilder.Entity("AbertaApi.Models.Book", b =>
-                {
-                    b.Navigation("Tags");
+                    b.HasOne("AbertaApi.Models.Tag", null)
+                        .WithMany()
+                        .HasForeignKey("TagsListId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

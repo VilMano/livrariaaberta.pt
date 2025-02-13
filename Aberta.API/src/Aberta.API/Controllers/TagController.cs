@@ -3,15 +3,16 @@ using AbertaApi.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace AbertaApi.Controllers;
+namespace Aberta.API.Controllers;
 
+[Route("[controller]")]
 public class TagController (ITagService tagService) : ControllerBase
 {
     [Authorize(AuthenticationSchemes = "ApiKey")]
     [HttpGet("single")]
     public async Task<IActionResult> GetTag(int id)
     {
-        ResultWrapper<Tag> result = await tagService.GetTag(id);
+        var result = await tagService.GetTag(id);
 
         if (result.IsSuccessful)
         {
@@ -23,9 +24,9 @@ public class TagController (ITagService tagService) : ControllerBase
 
     [Authorize(AuthenticationSchemes = "ApiKey")]
     [HttpGet("all/inactive")]
-    public async Task<IActionResult> GetInactiveTags()
+    public IActionResult GetInactiveTags()
     {
-        ResultWrapper<List<Tag>> result = tagService.GetInactiveTags();
+        var result = tagService.GetInactiveTags();
 
         if (result.IsSuccessful)
         {
@@ -37,9 +38,9 @@ public class TagController (ITagService tagService) : ControllerBase
     
     [Authorize(AuthenticationSchemes = "ApiKey")]
     [HttpGet("all/active")]
-    public async Task<IActionResult> GetActiveTags()
+    public IActionResult GetActiveTags()
     {
-        ResultWrapper<List<Tag>> result = tagService.GetActiveTags();
+        var result = tagService.GetActiveTags();
 
         if (result.IsSuccessful)
         {
@@ -53,8 +54,7 @@ public class TagController (ITagService tagService) : ControllerBase
     [HttpPost("create")]
     public async Task<IActionResult> CreateTag(Tag newTag)
     {
-        var a = await tagService.CreateTag(newTag);
-        ResultWrapper<Tag> result = a;
+        var result = await tagService.CreateTag(newTag);
 
         if (result.IsSuccessful)
         {
@@ -68,7 +68,7 @@ public class TagController (ITagService tagService) : ControllerBase
     [HttpPost("update")]
     public async Task<IActionResult> UpdateTag(Tag updatedTag)
     {
-        ResultWrapper<Tag> result = await tagService.UpdateTag(updatedTag);
+        var result = await tagService.UpdateTag(updatedTag);
 
         if (result.IsSuccessful)
         {
@@ -82,7 +82,7 @@ public class TagController (ITagService tagService) : ControllerBase
     [HttpPost("remove")]
     public async Task<IActionResult> DeleteTag(int id)
     {
-        ResultWrapper<Tag> result = await tagService.DeleteTag(id);
+        var result = await tagService.DeleteTag(id);
 
         if (result.IsSuccessful)
         {

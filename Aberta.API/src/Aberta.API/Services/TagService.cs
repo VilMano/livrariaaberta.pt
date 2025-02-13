@@ -5,13 +5,11 @@ using Serilog;
 
 namespace Aberta.API.Services;
 
-public class TagService(IConfiguration config, ITagRepository repo) : ITagService
+public class TagService(ITagRepository repo, ILogger<TagService> logger) : ITagService
 {
-    private readonly IConfiguration _config = config;
-
     public async Task<ResultWrapper<Tag>> CreateTag(Tag newTag)
     {
-        ResultWrapper<Tag> result = new ResultWrapper<Tag>();
+        var result = new ResultWrapper<Tag>();
 
         try
         {
@@ -19,27 +17,29 @@ public class TagService(IConfiguration config, ITagRepository repo) : ITagServic
             
             if(oldTag.Data == null)
             {
-                ResultWrapper<Tag> tag = await repo.CreateTag(newTag);
+                var tag = await repo.CreateTag(newTag);
                 result.IsSuccessful = true;
                 result.Data = tag.Data;
             }
             else
             {
+                logger.LogInformation("Tag already exists.");
                 result.Errors.Add("Tag already exists");
             }
         }
         catch (Exception e)
         {
-            Log.Information(e.Message);
+            logger.LogError(e.Message, e);
             result.Errors.Add("Something went wrong.");
         }
 
+        logger.LogInformation("Finished creating tag.");
         return result;
     }
     
     public async Task<ResultWrapper<Tag>> GetTag(int id)
     {
-        ResultWrapper<Tag> result = new ResultWrapper<Tag>();
+        var result = new ResultWrapper<Tag>();
 
         try
         {
@@ -56,7 +56,7 @@ public class TagService(IConfiguration config, ITagRepository repo) : ITagServic
         }
         catch (Exception e)
         {
-            Log.Information(e.Message);
+            logger.LogError(e.Message, e);
             result.Errors.Add("Something went wrong.");
         }
 
@@ -65,7 +65,7 @@ public class TagService(IConfiguration config, ITagRepository repo) : ITagServic
 
     public ResultWrapper<List<Tag>> GetActiveTags()
     {
-        ResultWrapper<List<Tag>> result = new ResultWrapper<List<Tag>>();
+        var result = new ResultWrapper<List<Tag>>();
 
         try
         {
@@ -82,7 +82,7 @@ public class TagService(IConfiguration config, ITagRepository repo) : ITagServic
         }
         catch (Exception e)
         {
-            Log.Information(e.Message);
+            logger.LogError(e.Message, e);
             result.Errors.Add("Something went wrong.");
         }
 
@@ -91,11 +91,11 @@ public class TagService(IConfiguration config, ITagRepository repo) : ITagServic
 
     public ResultWrapper<List<Tag>> GetActiveTags(string name)
     {
-        ResultWrapper<List<Tag>> result = new ResultWrapper<List<Tag>>();
+        var result = new ResultWrapper<List<Tag>>();
 
         try
         {
-            var tag = repo.GetTags(t => t.IsActive && t.Name.ToLowerInvariant() == name.ToLowerInvariant());
+            var tag = repo.GetTags(t => t.IsActive && t.Name.Equals(name, StringComparison.InvariantCultureIgnoreCase));
 
             if (tag.IsSuccessful)
             {
@@ -108,7 +108,7 @@ public class TagService(IConfiguration config, ITagRepository repo) : ITagServic
         }
         catch (Exception e)
         {
-            Log.Information(e.Message);
+            logger.LogError(e.Message, e);
             result.Errors.Add("Something went wrong.");
         }
 
@@ -117,7 +117,7 @@ public class TagService(IConfiguration config, ITagRepository repo) : ITagServic
 
     public ResultWrapper<List<Tag>> GetInactiveTags()
     {
-        ResultWrapper<List<Tag>> result = new ResultWrapper<List<Tag>>();
+        var result = new ResultWrapper<List<Tag>>();
 
         try
         {
@@ -134,7 +134,7 @@ public class TagService(IConfiguration config, ITagRepository repo) : ITagServic
         }
         catch (Exception e)
         {
-            Log.Information(e.Message);
+            logger.LogError(e.Message, e);
             result.Errors.Add("Something went wrong.");
         }
 
@@ -143,23 +143,22 @@ public class TagService(IConfiguration config, ITagRepository repo) : ITagServic
     
     public async Task<ResultWrapper<Tag>> UpdateTag(Tag updateTag)
     {
-        ResultWrapper<Tag> result = new ResultWrapper<Tag>();
+        var result = new ResultWrapper<Tag>();
 
         try
         {
             var oldTag = await repo.GetTag(updateTag.Id);
-            
-            ResultWrapper<Tag> tag;
+
             if(oldTag.Data != null)
             {
-                tag = await repo.UpdateTag(updateTag);
+                var tag = await repo.UpdateTag(updateTag);
                 result.Data = tag.Data;
                 result.IsSuccessful = true;
             }
         }
         catch (Exception e)
         {
-            Log.Information(e.Message);
+            logger.LogError(e.Message, e);
             result.Errors.Add("Something went wrong.");
         }
 
@@ -168,25 +167,50 @@ public class TagService(IConfiguration config, ITagRepository repo) : ITagServic
 
     public async Task<ResultWrapper<Tag>> DeleteTag(int id)
     {
-        ResultWrapper<Tag> result = new ResultWrapper<Tag>();
+        var result = new ResultWrapper<Tag>();
 
         try
         {
             var oldTag = await repo.GetTag(id);
-            ResultWrapper<Tag> tag;
             
             if(oldTag.Data != null)
             {
-                tag = await repo.DeleteTag(oldTag.Data);
+                await repo.DeleteTag(oldTag.Data);
                 result.IsSuccessful = true;
             }
         }
         catch (Exception e)
         {
-            Log.Information(e.Message);
+            logger.LogError(e.Message, e);
             result.Errors.Add("Something went wrong.");
         }
 
         return result;
+    }
+
+    public List<Tag> ValidateTags(List<Tag> tagsList)
+    {
+        List<Tag> newTagList = [];
+        foreach (var tag in tagsList)
+        {
+            var currentTag = GetActiveTags(tag.Name).Data.FirstOrDefault();
+
+            if (currentTag != null)
+            {
+                var tags = newTagList.Where(t => string.Equals(t.Name.ToLowerInvariant(), currentTag.Name.ToLowerInvariant()))
+                    .ToList();
+
+                if (tags.Count <= 0)
+                {
+                    newTagList.Add(currentTag);
+                }
+            }
+            else
+            {
+                newTagList.Add(tag);
+            }
+        }
+
+        return newTagList;
     }
 }

@@ -1,110 +1,99 @@
 using System.Net.Http.Headers;
-using AbertaScanner.Contracts.Services;
-using AbertaScanner.Contracts.Services.Libraries;
-using AbertaScanner.Models;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Aberta.Scanner.Contracts.Services;
+using Aberta.Scanner.Contracts.Services.Libraries;
+using Aberta.Scanner.Models;
 using Newtonsoft.Json;
 using Serilog;
 
-namespace AbertaScanner.Services;
+namespace Aberta.Scanner.Services;
 
-public class BookService : IBookService
+public class BookService(
+    IOpenLibraryService openLibService,
+    IBnpLibraryService bnpLibService,
+    IVendusService vendusService,
+    IConfiguration config)
+    : IBookService
 {
-    private readonly IOpenLibraryService _olService;
-    private readonly IBnpLibraryService _bnpService;
-
-    private readonly IVendusService _vendusService;
-    private readonly IConfiguration _config;
-
-    public BookService(
-        IOpenLibraryService openLibService,
-        IBnpLibraryService bnpLibService,
-        IVendusService vendusService,
-        IConfiguration config
-    )
-    {
-        _olService = openLibService;
-        _bnpService = bnpLibService;
-        _vendusService = vendusService;
-        _config = config;
-    }
-
     public async Task VendusProcessing()
     {
-        int batchCount = 25;
-        int page = 1;
-        int resultCount = 0;
+        const int batchCount = 25;
+        var page = 1;
+
+        var stockBooks = new ResultWrapper<List<Book>>();
+        var stop = false;
 
         do
         {
-            ResultWrapper<List<Book>> stockBooks = await _vendusService.GetBatchOfBookStock(batchCount, page);
-
-            if (stockBooks.Data is { Count: > 0 })
+            try
             {
-                resultCount = stockBooks.Data.Count;
-                // insert books in the database
-                foreach (Book book in stockBooks.Data)
-                {
-                    ResultWrapper<Book> existingBook = await GetBookFromAbertaAPI(book.Isbn);
-                    if (existingBook is { Data: not null })
-                    {
-                        existingBook.Data.Stock = book.Stock;
-                        existingBook.Data.Price = book.Price;
+                stockBooks = await vendusService.GetBatchOfBookStock(batchCount, page);
 
-                        await _vendusService.CreateBook(existingBook.Data);
-                    }
-                    else
+                if (stockBooks.Data is { Count: > 0 })
+                {
+                    // insert books in the database
+                    foreach (var book in stockBooks.Data)
                     {
-                        await _vendusService.CreateBook(book);
+                        var existingBook = await GetBookFromAbertaAPI(book.Isbn);
+                        if (existingBook is { Data: not null })
+                        {
+                            existingBook.Data.Stock = book.Stock;
+                            existingBook.Data.Price = book.Price;
+
+                            await UpdateBook(existingBook.Data);
+                        }
+                        else
+                        {
+                            book.IsActive = false;
+                            await CreateBook(book);
+                        }
                     }
                 }
+                else
+                {
+                    stop = true;
+                }
             }
-            else
+            catch (Exception e)
             {
-                resultCount = 0;
+                Console.WriteLine(e);
+                throw;
             }
 
+
             page++;
-        } while (resultCount == batchCount);
+        } while (!stop);
     }
 
     public async Task UpdateWithLibraries()
     {
-        ResultWrapper<BookDTO> bookJSON = new ResultWrapper<BookDTO>();
-
-        int batchCount = 25;
-        int page = 1;
+        var books = new List<Book>();
 
         try
         {
-            do
+            var activeBooks = await GetBooksFromAbertaAPI(20000, 1, true);
+            var inactiveBooks = await GetBooksFromAbertaAPI(20000, 1, false);
+
+            books.AddRange(activeBooks.Data.results);
+            books.AddRange(inactiveBooks.Data.results);
+
+            foreach (var book in books)
             {
-                bookJSON = await GetBooksFromAbertaAPI(batchCount, page);
+                var bnpBook = await bnpLibService.GetBook(book.Isbn);
+                var olBook = await openLibService.GetBook(book.Isbn);
 
-                foreach (var book in bookJSON.Data.results)
-                {
-                    Book bnpBook = await _bnpService.GetBook(book.Isbn);
-                    Book olBook = await _olService.GetBook(book.Isbn);
+                var fullBook = Utils.JoinObjects<Book>(bnpBook, olBook);
 
-                    Book fullBook = Utils.JoinObjects<Book>(bnpBook, olBook);
+                if (book.Language == null || string.IsNullOrEmpty(book.Language))
+                    book.Language = fullBook.Language ?? "";
 
-                    if (book.Author == null || string.IsNullOrEmpty(book.Author))
-                        book.Author = fullBook.Author ?? "";
+                if (book.ReleaseDate == null || string.IsNullOrEmpty(book.ReleaseDate))
+                    if (fullBook.ReleaseDate != null || !string.IsNullOrEmpty(fullBook.ReleaseDate))
+                        book.ReleaseDate = Utils.CaptureYearInDate(fullBook.ReleaseDate);
 
-                    if (book.Publisher == null || string.IsNullOrEmpty(book.Publisher))
-                        book.Publisher = fullBook.Publisher ?? "";
-
-                    if (book.Language == null || string.IsNullOrEmpty(book.Language))
-                        book.Language = fullBook.Language ?? "";
-
-                    if (book.ReleaseDate == null || string.IsNullOrEmpty(book.ReleaseDate))
-                        if (fullBook.ReleaseDate != null || !string.IsNullOrEmpty(fullBook.ReleaseDate))
-                            book.ReleaseDate = Utils.CaptureYearInDate(fullBook.ReleaseDate);
-
-                    await CreateBook(book);
-                }
-
-                page++;
-            } while (bookJSON.Data.results.Count == batchCount);
+                await UpdateBook(book);
+            }
         }
         catch (Exception e)
         {
@@ -113,15 +102,16 @@ public class BookService : IBookService
         }
     }
 
-    public async Task<ResultWrapper<BookDTO>> GetBooksFromAbertaAPI(int batchCount, int page)
+    private async Task<ResultWrapper<BookResults>> GetBooksFromAbertaAPI(int batchCount, int page, bool active)
     {
-        ResultWrapper<BookDTO> books = new ResultWrapper<BookDTO>();
+        var books = new ResultWrapper<BookResults>();
 
-        HttpClient client = new HttpClient();
-        client.BaseAddress = new Uri(_config.GetValue<string>("AbertaApi:BaseUrl") + "all");
-        client.DefaultRequestHeaders.Add("X-API-KEY", _config.GetValue<string>("AbertaApi:ApiKey"));
+        var client = new HttpClient();
+        var activeState = active ? "active" : "inactive";
+        client.BaseAddress = new Uri(config.GetValue<string>("AbertaApi:BaseUrl") + $"all/{activeState}");
+        client.DefaultRequestHeaders.Add("X-API-KEY", config.GetValue<string>("AbertaApi:ApiKey"));
 
-        Search search = new Search()
+        var search = new Search()
         {
             Page = page,
             NumberOfResults = batchCount,
@@ -131,12 +121,12 @@ public class BookService : IBookService
         };
 
         var fetchedBookRequest =
-            await client.PostAsJsonAsync("all", search);
+            await client.PostAsJsonAsync("", search);
 
         if (fetchedBookRequest.IsSuccessStatusCode)
         {
-            string result = fetchedBookRequest.Content.ReadAsStringAsync().Result;
-            books = JsonConvert.DeserializeObject<ResultWrapper<BookDTO>>(result);
+            var result = await fetchedBookRequest.Content.ReadAsStringAsync();
+            books = JsonConvert.DeserializeObject<ResultWrapper<BookResults>>(result);
             books.IsSuccessful = true;
         }
         else
@@ -147,24 +137,24 @@ public class BookService : IBookService
         return books;
     }
 
-    public async Task<ResultWrapper<Book>> GetBookFromAbertaAPI(string isbn)
+    private async Task<ResultWrapper<Book>> GetBookFromAbertaAPI(string isbn)
     {
-        ResultWrapper<Book> book = new ResultWrapper<Book>();
+        var book = new ResultWrapper<Book>();
 
-        HttpClient client = new HttpClient();
-        client.BaseAddress = new Uri(_config.GetValue<string>("AbertaApi:BaseUrl"));
-        client.DefaultRequestHeaders.Add("X-API-KEY", _config.GetValue<string>("AbertaApi:ApiKey"));
+        var client = new HttpClient();
+        client.BaseAddress = new Uri(config.GetValue<string>("AbertaApi:BaseUrl"));
+        client.DefaultRequestHeaders.Add("X-API-KEY", config.GetValue<string>("AbertaApi:ApiKey"));
 
         client.DefaultRequestHeaders.Accept.Add(
             new MediaTypeWithQualityHeaderValue("application/json"));
 
-        string attributes = $"?isbn={isbn}";
+        var attributes = $"?isbn={isbn}";
         var fetchedBookRequest =
             await client.GetAsync("single" + attributes);
 
         if (fetchedBookRequest.IsSuccessStatusCode)
         {
-            string result = fetchedBookRequest.Content.ReadAsStringAsync().Result;
+            var result = await fetchedBookRequest.Content.ReadAsStringAsync();
             book = JsonConvert.DeserializeObject<ResultWrapper<Book>>(result);
             book.IsSuccessful = true;
         }
@@ -176,15 +166,36 @@ public class BookService : IBookService
         return book;
     }
 
-    public async Task CreateBook(Book book)
+    private async Task CreateBook(Book book)
     {
-        HttpClient client = new HttpClient();
-        client.BaseAddress = new Uri(_config.GetValue<string>("AbertaApi:BaseUrl"));
-        client.DefaultRequestHeaders.Add("X-API-KEY", _config.GetValue<string>("AbertaApi:ApiKey"));
+        var client = new HttpClient();
+        client.BaseAddress = new Uri(config.GetValue<string>("AbertaApi:BaseUrl"));
+        client.DefaultRequestHeaders.Add("X-API-KEY", config.GetValue<string>("AbertaApi:ApiKey"));
 
         client.DefaultRequestHeaders.Accept.Add(
             new MediaTypeWithQualityHeaderValue("application/json"));
 
-        var res = await client.PostAsJsonAsync("update", book);
+        JsonSerializerOptions options = new()
+        {
+            ReferenceHandler = ReferenceHandler.Preserve,
+            WriteIndented = true
+        };
+
+        var res = await client.PostAsJsonAsync("create", book, options);
+    }
+
+    private async Task UpdateBook(Book book)
+    {
+        var client = new HttpClient();
+        client.BaseAddress = new Uri(config.GetValue<string>("AbertaApi:BaseUrl"));
+        client.DefaultRequestHeaders.Add("X-API-KEY", config.GetValue<string>("AbertaApi:ApiKey"));
+
+        JsonSerializerOptions options = new()
+        {
+            ReferenceHandler = ReferenceHandler.Preserve,
+            WriteIndented = true
+        };
+
+        var res = await client.PostAsJsonAsync("update", book, options);
     }
 }

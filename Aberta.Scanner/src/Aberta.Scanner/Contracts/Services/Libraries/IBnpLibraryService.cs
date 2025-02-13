@@ -1,6 +1,6 @@
-using AbertaScanner.Models;
+using Aberta.Scanner.Models;
 
-namespace AbertaScanner.Contracts.Services.Libraries;
+namespace Aberta.Scanner.Contracts.Services.Libraries;
 
 public interface IBnpLibraryService {
     public Task<Book> GetBook(string isbn);

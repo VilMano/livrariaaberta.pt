@@ -1,30 +1,19 @@
 using AbertaApi.Contracts.Services;
-using AbertaApi.Contracts.Services.Libraries;
 using AbertaApi.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
-namespace AbertaApi.Controllers;
+namespace Aberta.API.Controllers;
 
 [Route("[controller]")]
 [ApiController]
-public class BooksController : ControllerBase
+public class BooksController(IBookService bs, IVendusService vendusService) : ControllerBase
 {
-    private readonly IBookService _bs;
-    private readonly IVendusService _vendusService;
-
-    public BooksController(IBookService bs, IVendusService vendusService)
-    {
-        _bs = bs;
-        _vendusService = vendusService;
-    }
-
     [Authorize(AuthenticationSchemes = "ApiKey")]
     [HttpGet("single")]
-    public async Task<IActionResult> GetBook(string isbn)
+    public IActionResult GetBook(string isbn)
     {
-        ResultWrapper<Book> result = _bs.GetBook(isbn);
+        var result = bs.GetBook(isbn);
 
         if (result.IsSuccessful)
         {
@@ -35,43 +24,12 @@ public class BooksController : ControllerBase
     }
 
     [Authorize(AuthenticationSchemes = "ApiKey")]
-    [HttpPost("all")]
-    public async Task<IActionResult> GetBooks(BookSearch search)
+    [HttpPost("all/inactive")]
+    public IActionResult GetInactiveBooks(BookSearch search)
     {
-        ResultWrapper<BookResults> result = new ResultWrapper<BookResults>();
+        var result = new ResultWrapper<BookResults>();
         
-        if (string.IsNullOrEmpty(search.SearchTerm))
-        {
-            string orderBy = search.SortOrder;
-            string sortBy = search.SortBy;
-
-            string order = $"{sortBy},{orderBy}";
-            
-            result = _bs.GetBooks(search.NumberOfResults, search.Page, order);
-            
-            if (result.IsSuccessful)
-            {
-                return Ok(result);
-            }
-        }
-        else
-        {
-            result = await _bs.SearchBooksByTitleAndOtherAttributes(search.SearchTerm, search.NumberOfResults, search.Page);
-
-            if (result.IsSuccessful)
-            {
-                return Ok(result);
-            }
-        }
-        
-        return BadRequest(result);
-    }
-
-    [Authorize(AuthenticationSchemes = "ApiKey")]
-    [HttpPost("update")]
-    public async Task<IActionResult> CreateOrUpdateBook(Book book)
-    {
-        ResultWrapper<Book> result = await _bs.UpdateBook(book);
+        result = bs.SearchBooksByTitleAndOtherAttributes(search, false);
 
         if (result.IsSuccessful)
         {
@@ -82,10 +40,40 @@ public class BooksController : ControllerBase
     }
     
     [Authorize(AuthenticationSchemes = "ApiKey")]
+    [HttpPost("all/active")]
+    public IActionResult GetActiveBooks(BookSearch search)
+    {
+        var result = new ResultWrapper<BookResults>();
+        
+        result = bs.SearchBooksByTitleAndOtherAttributes(search, true);
+
+        if (result.IsSuccessful)
+        {
+            return Ok(result);
+        }
+
+        return BadRequest(result);
+    }
+
+    // [Authorize(AuthenticationSchemes = "ApiKey")]
+    [HttpPost("update")]
+    public async Task<IActionResult> UpdateBook(Book book)
+    {
+        var result = await bs.UpdateBook(book);
+
+        if (result.IsSuccessful)
+        {
+            return Ok(result);
+        }
+
+        return BadRequest(result);
+    }
+    
+    // [Authorize(AuthenticationSchemes = "ApiKey")]
     [HttpPost("create")]
     public async Task<IActionResult> CreateBook(Book book)
     {
-        ResultWrapper<Book> result = await _bs.CreateBook(book);
+        var result = await bs.CreateBook(book);
 
         if (result.IsSuccessful)
         {
@@ -99,7 +87,7 @@ public class BooksController : ControllerBase
     [HttpDelete("remove")]
     public async Task<IActionResult> DeleteBook(string isbn)
     {
-        ResultWrapper<Book> result = await _bs.DeleteBook(isbn);
+        var result = await bs.DeleteBook(isbn);
 
         if (result.IsSuccessful)
         {
@@ -112,7 +100,7 @@ public class BooksController : ControllerBase
     [HttpGet("ol")]
     public async Task<IActionResult> GetOpenLibraryBook(string isbn)
     {
-        ResultWrapper<Book> result = await _bs.GetLibrarBook(isbn, ApiService.OpenLibrary);
+        var result = await bs.GetLibraryBook(isbn, ApiService.OpenLibrary);
 
         if (result.IsSuccessful)
         {
@@ -125,7 +113,7 @@ public class BooksController : ControllerBase
     [HttpGet("bnp")]
     public async Task<IActionResult> GetBnpBook(string isbn)
     {
-        ResultWrapper<Book> result = await _bs.GetLibrarBook(isbn, ApiService.BibliotecaNacionalPortuguesa);
+        var result = await bs.GetLibraryBook(isbn, ApiService.BibliotecaNacionalPortuguesa);
 
         if (result.IsSuccessful)
         {
@@ -139,7 +127,7 @@ public class BooksController : ControllerBase
     [HttpGet("vendus")]
     public async Task<IActionResult> GetVendusBook(string isbn)
     {
-        ResultWrapper<Book> result = await _vendusService.GetBook(isbn);
+        var result = await vendusService.GetBook(isbn);
 
         if (result.IsSuccessful)
         {
@@ -153,7 +141,7 @@ public class BooksController : ControllerBase
     [HttpGet("vendus/batch")]
     public async Task<IActionResult> GetVendusBooks(int numberOfResults, int page)
     {
-        ResultWrapper<List<Book>> result = await _vendusService.GetBatchOfBookStock(numberOfResults, page);
+        var result = await vendusService.GetBatchOfBookStock(numberOfResults, page);
 
         if (result.IsSuccessful)
         {

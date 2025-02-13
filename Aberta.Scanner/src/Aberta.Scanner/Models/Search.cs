@@ -1,4 +1,4 @@
-namespace AbertaScanner.Models;
+namespace Aberta.Scanner.Models;
 
 public class Search
 {

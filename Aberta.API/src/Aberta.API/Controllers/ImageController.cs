@@ -1,25 +1,16 @@
 using Aberta.API.Contracts.Services;
-using AbertaApi.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace AbertaApi.Controllers;
+namespace Aberta.API.Controllers;
 
-[Authorize(AuthenticationSchemes = "ApiKey")]
 [Route("[controller]")]
-public class ImageController : ControllerBase
+public class ImageController(IImageService vs) : ControllerBase
 {
-    private readonly IImageService _vs;
-
-    public ImageController(IImageService vs)
-    {
-        _vs = vs;
-    }
-
     [HttpGet("{imageName}")]
-    public async Task<IActionResult> GetBookImage(string imageName)
+    public IActionResult GetBookImage(string imageName)
     {
-        ResultWrapper<Byte[]> result = _vs.GetImage(imageName);
+        var result = vs.GetImage(imageName);
 
         if (result.IsSuccessful)
         {
@@ -33,7 +24,7 @@ public class ImageController : ControllerBase
     [HttpPost("create")]
     public async Task<IActionResult> CreateBookImage([FromForm] IFormFile file)
     {
-        ResultWrapper<Byte[]> result = await _vs.HandleImageCreation(file);
+        var result = await vs.HandleImageCreation(file);
 
         if (result.IsSuccessful)
         {
@@ -45,9 +36,9 @@ public class ImageController : ControllerBase
 
     [Authorize(AuthenticationSchemes = "ApiKey")]
     [HttpDelete("delete")]
-    public async Task<IActionResult> DeleteBookImage(string path)
+    public IActionResult DeleteBookImage(string path)
     {
-        ResultWrapper<bool> result = _vs.DeleteImage(path);
+        var result = vs.DeleteImage(path);
 
         if (result.IsSuccessful)
             return Ok();

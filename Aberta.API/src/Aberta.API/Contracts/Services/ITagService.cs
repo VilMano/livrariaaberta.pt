@@ -11,4 +11,5 @@ public interface ITagService
     public Task<ResultWrapper<Tag>> DeleteTag(int id);
     public Task<ResultWrapper<Tag>> UpdateTag(Tag updateTag);
     public Task<ResultWrapper<Tag>> CreateTag(Tag newTag);
+    public List<Tag> ValidateTags(List<Tag> tagsList);
 }

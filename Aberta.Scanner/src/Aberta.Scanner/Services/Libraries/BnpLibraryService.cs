@@ -1,36 +1,37 @@
-using AbertaScanner.Contracts.Services.Libraries;
-using AbertaScanner.Models;
+using Aberta.Scanner.Contracts.Services.Libraries;
+using Aberta.Scanner.Models;
 using Newtonsoft.Json;
 using Serilog;
 
-namespace AbertaScanner.Services.Libraries;
+namespace Aberta.Scanner.Services.Libraries;
 
-public class BnpLibraryService : IBnpLibraryService
+public class BnpLibraryService(IConfiguration config) : IBnpLibraryService
 {
-    private readonly IConfiguration _configuration;
-
-    public BnpLibraryService(IConfiguration config)
-    {
-        _configuration = config;
-    }
-    
     public async Task<Book> GetBook(string isbn)
     {
-        Book book = new Book();
+        Book book = new Book()
+        {
+            Title = "",
+            Author = "",
+            Price = 0,
+            Stock = 0,
+            IsActive = false
+        };
         try
         {
             Log.Information($"[{isbn}] Retrieving book from OpenLibrary...");
             isbn = Utils.CleanIsbn(isbn);
 
-            HttpClient client = new HttpClient();
-            client.BaseAddress = new Uri($"{_configuration.GetValue<string>("AbertaApi:BaseUrl")}bnp");
+            var client = new HttpClient();
+            client.BaseAddress = new Uri($"{config.GetValue<string>("AbertaApi:BaseUrl")}bnp");
 
-            HttpResponseMessage request = await HttpRequests.GetAsync(client, $"?isbn={isbn}");
+            var request = await client.GetAsync($"?isbn={isbn}");
 
             if (request.IsSuccessStatusCode)
             {
-                string response = request.Content.ReadAsStringAsync().Result;
-                book = JsonConvert.DeserializeObject<Book>(response);
+                var response = request.Content.ReadAsStringAsync().Result;
+                var bookWrap = JsonConvert.DeserializeObject<ResultWrapper<Book>>(response);
+                book = bookWrap.Data;
                 
                 return book;
             }

@@ -1,3 +1,4 @@
+using Aberta.API.Utils;
 using AbertaApi;
 using AbertaApi.Models;
 using Newtonsoft.Json;
@@ -37,7 +38,8 @@ public class UtilsTest
             Price = 0,
             Author = "José Saramago",
             Language = "Português",
-            ReleaseDate = "2014-01-01"
+            ReleaseDate = "2014-01-01",
+            IsActive = true
         };
 
         Book book2 = new Book
@@ -52,7 +54,8 @@ public class UtilsTest
             Price = 15,
             Author = "José Saramago",
             Language = "Português",
-            ReleaseDate = "2014-01-01"
+            ReleaseDate = "2014-01-01",
+            IsActive = true
         };
 
         Book book = Utils.JoinObjects<Book>(book1, book2);

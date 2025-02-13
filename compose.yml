@@ -1,38 +1,48 @@
 services:
-  db:
-    image: mysql:9.1
-    container_name: db
-    restart: always
-    environment:
-      - MYSQL_DATABASE=${MYSQL_DATABASE}
-      - MYSQL_USER=${MYSQL_USER}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
-    volumes:
-      - ./Aberta.API/db/initdb.d/:/docker-entrypoint-initdb.d/
-    ports:
-      - "${MYSQL_PORT}:3306"
   api:
-    container_name: api
+    container_name: Aberta.API
     build:
-      context: ./Aberta.API/.
-    ports:
-      - 8080:8080
-    volumes:
-      - ./Aberta.API/wwwroot:/App/wwwroot
-    depends_on:
-      - db
-  scanner:
-    container_name: scanner
-    build:
-      context: ./Aberta.Scanner/.
+      context: ./Aberta/Test/Aberta.API/.
     ports:
       - 8081:8080
-  hangfire:
-    container_name: sql_server
+    volumes:
+      - ./Aberta/Test/Aberta.API/wwwroot:/App/wwwroot
+      - ./Aberta/Test/Aberta.API/Logs:/App/Logs
+      - ./Aberta/Test/Aberta.API/Keys:/root/.aspnet/DataProtection-Keys
+  scanner:
+    container_name: Aberta.Scanner
+    build:
+      context: ./Aberta/Test/Aberta.Scanner/.
+    ports:
+      - 8083:8080
+    depends_on:
+      - hangfire
+  backoffice:
+    container_name: Aberta.BackOffice
+    build:
+      context: ./Aberta/Test/Aberta.BackOffice/.
+    ports:
+      - 8082:8080
+    volumes:
+      - ./Aberta/Test/Aberta.BackOffice/db:/App/Data
+      - ./Aberta/Test/Aberta.BackOffice/Keys:/root/.aspnet/DataProtection-Keys
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+  mariadb:
+    image: mariadb:11.2
+    container_name: Aberta.DB
+    restart: always
+    environment:
+      - MARIADB_ROOT_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - ./Aberta/Test/Aberta.API/db/initdb.d/:/docker-entrypoint-initdb.d/
+    ports:
+      - "${MARIADB_PORT}:3306"
+  sqlserver:
+    container_name: Aberta.SqlServer
     image: mcr.microsoft.com/mssql/server:2022-latest
     ports:
       - "1433:1433"
     environment:
-      MSSQL_SA_PASSWORD: "P4sSw0+rd@"
+      MSSQL_SA_PASSWORD: ${DB_PASSWORD}
       ACCEPT_EULA: "Y"

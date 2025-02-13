@@ -1,29 +1,26 @@
+using System.Text.Json.Serialization;
 using Aberta.API.Contracts.Services;
+using Aberta.API.Models.Auth;
+using Aberta.API.Repositories;
 using Aberta.API.Services;
 using AbertaApi.Contracts.Repositories;
 using AbertaApi.Contracts.Services;
 using AbertaApi.Contracts.Services.Libraries;
 using AbertaApi.Data;
-using AbertaApi.Repositories;
-using AbertaApi.Services;
-using AbertaScanner.Services;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
-Log.Logger = new LoggerConfiguration()
-    .WriteTo.Console()
-    .WriteTo.File("log.txt",
-        rollingInterval: RollingInterval.Day)
-    .CreateLogger();
+builder.Host.UseSerilog((context, configuration) =>
+    configuration.ReadFrom.Configuration(context.Configuration));
 
 builder.Services.AddAuthentication("ApiKey")
     .AddScheme<ApiKeyAuthenticationSchemeOptions, ApiKeyAuthenticationSchemeHandler>(
         "ApiKey",
         opts => opts.ApiKey = builder.Configuration.GetValue<string>("ApiKey")
     );
-
 
 // Add services to the container.
 builder.Services
@@ -32,9 +29,7 @@ builder.Services
 .AddScoped<IOpenLibraryService, OpenLibraryService>()
 .AddScoped<IBnpLibraryService, BnpLibraryService>()
 .AddScoped<IVendusService, VendusService>()
-
 .AddScoped<IImageService, ImageService>()
-
 .AddScoped<ITagRepository, TagRepository>()
 .AddScoped<ITagService, TagService>();
 
@@ -43,12 +38,17 @@ builder.Services.AddDbContext<Context>(options => {
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
 });
 
-builder.Services.AddControllers();
+builder.Services.AddAntiforgery();
+
+builder.Services.AddControllers().AddJsonOptions(x =>
+    x.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.Preserve);
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+app.UseSerilogRequestLogging();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -57,7 +57,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+app.UseAntiforgery();
 
 app.UseAuthorization();
 

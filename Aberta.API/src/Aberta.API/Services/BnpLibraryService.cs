@@ -5,163 +5,89 @@ using AbertaApi.Contracts.Services.Libraries;
 using AbertaApi.Models;
 using Serilog;
 
-namespace AbertaScanner.Services;
+namespace Aberta.API.Services;
 
-public class BnpLibraryService(IConfiguration configuration) : IBnpLibraryService
+public class BnpLibraryService(IConfiguration configuration, ILogger<BnpLibraryService> logger) : IBnpLibraryService
 {
     public async Task<ResultWrapper<Book>> GetBook(string isbn)
     {
-        ResultWrapper<Book> book = new ResultWrapper<Book>();
+        logger.LogInformation("Getting book from Bnp Library...");
+        var book = new ResultWrapper<Book>();
         
         try
         {
-            isbn = Utils.CleanIsbn(isbn);
+            isbn = Utils.Utils.CleanIsbn(isbn);
 
             var client = new HttpClient();
-            client.BaseAddress = new Uri(configuration["Bnp:BaseUrl"]);
+            client.BaseAddress = new Uri(configuration["Bnp:BaseUrl"] ?? string.Empty);
             client.DefaultRequestHeaders.Accept.Add(
                 new MediaTypeWithQualityHeaderValue("application/json"));
                 
-            HttpResponseMessage request = await Utils.GetAsync(client, $"?id={isbn}");
+            var request = await client.GetAsync($"?id={isbn}");
 
-            if (request.IsSuccessStatusCode)
-            {
-                string bookXml = request.Content.ReadAsStringAsync().Result;
-                book.Data = BnpLibraryXmlToBook(bookXml);
-                return book;
-            }
-            else
-            {
-                return book;
-            }
+            if (!request.IsSuccessStatusCode) return book;
+            
+            var bookXml = await request.Content.ReadAsStringAsync();
+            book.Data = BnpLibraryXmlToBook(bookXml);
+            book.IsSuccessful = true;
+
+            return book;
         }
         catch (Exception e)
         {
-            Log.Error(e, ".NET error");
+            logger.LogError(e.Message, e);
             return book;
         }
     }
-    
-    public static Book BnpLibraryXmlToBook(string xml)
+
+    private static Book BnpLibraryXmlToBook(string xml)
     {
-        XmlDocument doc = new XmlDocument();
+        var doc = new XmlDocument();
         doc.LoadXml(xml);
 
-        Book fetchedBook = new();
-
-        if (!xml.ToLower().Contains("registo inexistente"))
+        Book fetchedBook = new()
         {
-                XmlNodeList nodes = doc.ChildNodes[1].ChildNodes[0].ChildNodes;
-                foreach (XmlNode node in nodes)
-                {
-                    switch (node.LocalName)
+            Title = "",
+            Stock = 0,
+            Price = 0,
+            IsActive = false
+        };
+
+        if (xml.Contains("registo inexistente", StringComparison.CurrentCultureIgnoreCase)) return fetchedBook;
+        
+        var nodes = doc.ChildNodes[1]?.ChildNodes[0]?.ChildNodes;
+        if (nodes == null) return fetchedBook;
+        
+        foreach (XmlNode node in nodes)
+        {
+            switch (node.LocalName)
+            {
+                case "language":
+                    if (fetchedBook.Language == null)
                     {
-                        case "identifier":
+                        foreach (XmlNode language in node.ChildNodes)
+                        {
+                            if (language.Attributes?["type"] == null) continue;
 
-                            if (node.Attributes["type"].Value == "uri")
+                            if (language.Attributes["type"]?.Value == "text")
                             {
-                                break;
+                                fetchedBook.Language = language.InnerText;
                             }
-
-                            if (fetchedBook.Isbn == null)
-                            {
-                                if (node.Attributes["type"].Value == "isbn")
-                                {
-                                    fetchedBook.Isbn = node.InnerText;
-                                    break;
-                                }
-                            }
-
-                            if (node.Attributes["type"].Value == "stock")
-                            {
-                                break;
-                            }
-                            break;
-                        case "titleInfo":
-                            if (fetchedBook.Title == null)
-                                fetchedBook.Title = node.ChildNodes[0].InnerText;
-
-                            break;
-                        case "name":
-                            if (fetchedBook.Author == null)
-                            {
-                                // check if name tag is for creator or contributor
-                                bool isCreator = false;
-                                foreach (XmlNode nameTags in node.ChildNodes)
-                                {
-                                    if (nameTags.LocalName == "role")
-                                    {
-                                        foreach (XmlNode role in nameTags.ChildNodes)
-                                        {
-                                            if (role.LocalName == "roleTerm")
-                                            {
-                                                if (role.Attributes["type"] != null)
-                                                    if (role.Attributes["type"].Value == "text")
-                                                    {
-                                                        if (role.InnerText == "creator")
-                                                        {
-                                                            isCreator = true;
-                                                        }
-                                                    }
-                                            }
-                                        }
-                                    }
-                                }
-
-                                if (isCreator)
-                                {
-                                    if (node.Attributes["type"] != null)
-                                    {
-                                        if (node.Attributes["type"].Value == "personal")
-                                        {
-                                            foreach (XmlNode name in node.ChildNodes)
-                                            {
-                                                if (name.LocalName == "namePart")
-                                                {
-                                                    string nodeText = name.InnerText;
-                                                    string[] nameArr = nodeText.Split(",");
-
-                                                    fetchedBook.Author =
-                                                        nameArr[1].Trim() + " " + nameArr[0].Trim();
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            break;
-                        case "language":
-                            if (fetchedBook.Language == null)
-                            {
-                                foreach (XmlNode language in node.ChildNodes)
-                                {
-                                    if (language.Attributes["type"] != null)
-                                    {
-                                        if (language.Attributes["type"].Value == "text")
-                                        {
-                                            fetchedBook.Language = language.InnerText;
-                                        }
-                                    }
-                                }
-                            }
-                            break;
-                        case "originInfo":
-                            foreach (XmlNode info in node.ChildNodes)
-                            {
-                                if (fetchedBook.Publisher == null)
-                                    if (info.LocalName == "publisher")
-                                        fetchedBook.Publisher = info.InnerText;
-
-                                if (fetchedBook.ReleaseDate == null)
-                                    if (info.LocalName == "dateIssued")
-                                        fetchedBook.ReleaseDate = info.InnerText;
-                            }
-                            break;
-                        default:
-                            break;
+                        }
                     }
-                }
+
+                    break;
+                case "originInfo":
+                    foreach (XmlNode info in node.ChildNodes)
+                    {
+                        if (fetchedBook.ReleaseDate != null) continue;
+
+                        if (info.LocalName == "dateIssued")
+                            fetchedBook.ReleaseDate = info.InnerText;
+                    }
+
+                    break;
+            }
         }
 
         return fetchedBook;

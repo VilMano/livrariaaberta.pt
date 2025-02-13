@@ -1,6 +1,6 @@
 using Newtonsoft.Json;
 
-namespace AbertaScanner.Models;
+namespace Aberta.Scanner.Models;
 
 class OlObject {
     [JsonProperty("publish_date")]

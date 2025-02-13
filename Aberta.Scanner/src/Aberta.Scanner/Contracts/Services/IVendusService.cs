@@ -1,6 +1,6 @@
-using AbertaScanner.Models;
+using Aberta.Scanner.Models;
 
-namespace AbertaScanner.Contracts.Services;
+namespace Aberta.Scanner.Contracts.Services;
 
 public interface IVendusService {
     // public Task<ResultWrapper<Product>> GetEntireBookStock(int recordsPerPage);

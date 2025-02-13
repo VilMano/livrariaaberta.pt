@@ -1,0 +1,235 @@
+﻿@page "/Book/{id}"
+@using AbertaApi.Models
+@using AbertaBackOffice.Services
+@using AbertaBackOffice.Models
+@using Microsoft.AspNetCore.Authorization
+@using Notification = AbertaBackOffice.Models.Notification
+@inject BookService Service
+@inject ImageService ImageService
+@inject IConfiguration config;
+
+@attribute [Authorize]
+
+@rendermode InteractiveServer
+
+<PageTitle>Edit book</PageTitle>
+<EditForm Model="Book" OnSubmit="Submit" FormName="EditBook">
+    <div class="container-fluid">
+        <div class="row mb-5">
+            <div class="col-6">
+                <h1 class="text-white">Edit</h1>
+            </div>
+        </div>
+        <div class="row justify-content-center">
+            <div class="col-4">
+                <div class="row">
+                    <div class="col-12">
+                        <object style="max-width: 100%; height: auto" data="@(config.GetValue<string>("AbertaApi:ImageUrl") + Book.Isbn)" type="image/jpg">
+                            <img style="max-width: 100%; height: auto" src="./notfound.jpg" alt="Picture of the book">
+                        </object>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-4 p-3" style="color: white">
+                        <InputFile OnChange="@ChangeHandler"></InputFile>
+                    </div>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="mb-3">
+                    <label>ISBN</label>
+                    <InputText class="form-control input-0" @bind-Value="Book.Isbn" disabled="disabled" placeholder=""
+                               aria-label="isbn" aria-describedby="basic-addon1"></InputText>
+                </div>
+
+                <div class="mb-3">
+                    <label>Author</label>
+                    <InputText class="form-control input-0" @bind-Value="Book.Author" placeholder="Author"
+                               aria-label="Author" aria-describedby="basic-addon1"></InputText>
+                </div>
+
+                <div class="mb-3">
+                    <label>Title</label>
+                    <InputText class="form-control input-0" @bind-Value="Book.Title" placeholder="Title"
+                               aria-label="Title" aria-describedby="basic-addon1"></InputText>
+                </div>
+
+                <div class="mb-3">
+                    <label>Publisher</label>
+                    <InputText class="form-control input-0" @bind-Value="Book.Publisher" placeholder="Publisher"
+                               aria-label="Publisher" aria-describedby="basic-addon1"></InputText>
+                </div>
+
+                <div class="mb-3">
+                    <label>Language</label>
+                    <InputText class="form-control input-0" @bind-Value="Book.Language" placeholder="Language"
+                               aria-label="Language" aria-describedby="basic-addon1"></InputText>
+                </div>
+
+                <div class="mb-3">
+                    <label>Translator</label>
+                    <InputText class="form-control input-0" @bind-Value="Book.Translator" placeholder="Translator"
+                               aria-label="Translator" aria-describedby="basic-addon1"></InputText>
+                </div>
+
+                <div class="mb-3" style="display: flex; justify-content: space-evenly; ">
+                    <div class="row" style="width: 100%;">
+                        <div class="check col-6">
+                            <label>Active</label>
+                            <InputCheckbox @bind-Value="Book.IsActive"
+                                           aria-label="Active" aria-describedby="basic-addon1"></InputCheckbox>
+                        </div>
+
+                        <div class="col-3">
+                            <label>Price</label>
+                            <InputNumber class="form-control input-0" @bind-Value="Book.Price" disabled="disabled" placeholder="Price"
+                                         aria-label="Price" aria-describedby="basic-addon1"></InputNumber>
+                        </div>
+
+                        <div class="col-3">
+                            <label>Stock</label>
+                            <InputNumber class="form-control input-0" @bind-Value="Book.Stock" placeholder="Stock"
+                                         aria-label="Stock" aria-describedby="basic-addon1"></InputNumber>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label>Released Date</label>
+                    <InputText style="max-width: 10rem;" class="form-control input-0" @bind-Value="Book.ReleaseDate" placeholder="Released Date"
+                               aria-label="Released Date" aria-describedby="basic-addon1"></InputText>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="row justify-content-center">
+            <div class="col-8">
+                <div class="mb-3 w-100">
+                    <label>Synopsis</label>
+                    <InputTextArea rows="6" class="form-control input-0" @bind-Value="Book.Synopsis"
+                                   placeholder="Synopsis"
+                                   aria-label="Synopsis" aria-describedby="basic-addon1"></InputTextArea>
+                </div>
+
+                <div class="mb-3">
+                    <label>Tags</label>
+                    <InputText class="form-control input-0" @bind-Value="Tags" placeholder="Tags"
+                               aria-label="Tags" aria-describedby="basic-addon1"></InputText>
+                </div>
+
+                <div class="mb-3">
+                    <button type="submit" class="btn btn-success">Update</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</EditForm>
+
+<SfMessage CssClass="message" Severity="@notification.Severity" Visible="@Visible" ShowIcon="false"
+           ShowCloseIcon="true" ContentAlignment="HorizontalAlign.Left">
+    <h1>@notification.Title</h1>
+    <p>@notification.Content</p>
+</SfMessage>
+
+<style>
+    .message {
+        width: 400px;
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        margin: 1rem;
+        max-width: 400px;
+    }
+</style>
+
+@code {
+    [Parameter] public string Id { get; set; }
+
+    [SupplyParameterFromForm] private string Tags { get; set; } = "";
+    [SupplyParameterFromForm] private Book? Book { get; set; } = new Book();
+    [SupplyParameterFromForm] private string CoverPicture { get; set; }
+
+    private IBrowserFile Image { get; set; }
+
+    private Notification notification;
+    private bool Visible { get; set; } = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        notification = new Notification();
+        var response = await Service.GetBook(Id);
+        if (response.IsSuccessful)
+            Book = response.Data;
+
+        foreach (var tagName in Book.TagsList.Select(t => t.Name).ToList())
+        {
+            Tags += tagName + ", ";
+        }
+
+        if (Tags is { Length: > 0 })
+            Tags = Tags.Substring(0, Tags.Length - 2);
+
+        CoverPicture = config.GetValue<string>("AbertaApi:ImageUrl") + Id;
+    }
+
+    private async Task Submit()
+    {
+        try
+        {
+            if (Tags.Length > 0)
+            {
+                Book.TagsList.RemoveAll(t => t.IsActive);
+                string[] tags = Tags.Replace(" ", "").Split(",");
+
+                foreach (var tag in tags)
+                {
+                    
+                    Book.TagsList.Add(new Tag { Name = tag });
+                }
+            }
+
+            var book = await Service.UpdateBook(Book);
+
+            if (book.IsSuccessful)
+            {
+                notification.Title = "Success";
+                notification.Content = "Updated book successfuly";
+                notification.Severity = MessageSeverity.Success;
+                Visible = true;
+
+                Book = book.Data;
+            }
+            else
+            {
+                notification.Title = "Error";
+                notification.Content = book.Errors.Count > 0 ? string.Join("\n", book.Errors) : "Something went wrong.";
+                notification.Severity = MessageSeverity.Error;
+                Visible = true;
+            }
+
+            if (Image != null)
+            {
+                await ImageService.CreateImage(Book.Isbn, Image);
+                CoverPicture = config.GetValue<string>("AbertaApi:ImageUrl") + Id;
+            }
+        }
+        catch (Exception e)
+        {
+            notification.Title = "Error";
+            notification.Content = "Something went wrong.";
+            notification.Severity = MessageSeverity.Error;
+            Visible = true;
+
+            Console.WriteLine(e);
+        }
+    }
+
+    private void ChangeHandler(InputFileChangeEventArgs e)
+    {
+        Image = e.File;
+    }
+
+}

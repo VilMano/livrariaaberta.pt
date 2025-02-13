@@ -1,9 +1,13 @@
-using AbertaScanner.Contracts.Services;
-using AbertaScanner.Contracts.Services.Libraries;
-using AbertaScanner.Services;
-using AbertaScanner.Services.Libraries;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Aberta.Scanner.Contracts.Services;
+using Aberta.Scanner.Contracts.Services.Libraries;
+using Aberta.Scanner.Services;
+using Aberta.Scanner.Services.Libraries;
 using Hangfire;
 using Hangfire.Dashboard;
+using Microsoft.AspNetCore.Http.Json;
+using Newtonsoft.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,15 +26,15 @@ var app = builder.Build();
 
 app.UseHangfireDashboard("/hangfire", new DashboardOptions
 {
-    Authorization = new [] { new MyAuthorizationFilter()}
+    Authorization = [new MyAuthorizationFilter()]
 });
 
-RecurringJob.AddOrUpdate<IBookService>("VendusProcessing", s => s.VendusProcessing(), Cron.Hourly);
-RecurringJob.AddOrUpdate<IBookService>("LibraryProcessing", s => s.UpdateWithLibraries(), Cron.Hourly);
+RecurringJob.AddOrUpdate<IBookService>("VendusProcessing", s => s.VendusProcessing(), Cron.Never);
+RecurringJob.AddOrUpdate<IBookService>("LibraryProcessing", s => s.UpdateWithLibraries(), Cron.Never);
 
 app.Run();
 
-public class MyAuthorizationFilter : IDashboardAuthorizationFilter
+internal class MyAuthorizationFilter : IDashboardAuthorizationFilter
 {
     public bool Authorize(DashboardContext context) => true;
 }
