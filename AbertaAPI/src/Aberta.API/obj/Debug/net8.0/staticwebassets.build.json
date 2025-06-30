@@ -1,0 +1,19 @@
+{
+  "Version": 1,
+  "Hash": "cz7GwYotwJtSmWJpIK10u2xq0RAQU+IjiB3jiKryWKA=",
+  "Source": "Aberta.API",
+  "BasePath": "_content/Aberta.API",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [
+    {
+      "Name": "Aberta.API/wwwroot",
+      "Source": "Aberta.API",
+      "ContentRoot": "/home/vil/repos/Aberta/AbertaAPI/src/Aberta.API/wwwroot/",
+      "BasePath": "_content/Aberta.API",
+      "Pattern": "**"
+    }
+  ],
+  "Assets": []
+}

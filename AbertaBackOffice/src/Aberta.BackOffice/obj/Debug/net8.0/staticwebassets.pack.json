@@ -1,0 +1,49 @@
+{
+  "Files": [
+    {
+      "Id": "/home/vil/repos/Aberta/AbertaBackOffice/src/Aberta.BackOffice/obj/Debug/net8.0/scopedcss/projectbundle/AbertaBackOffice.bundle.scp.css",
+      "PackagePath": "staticwebassets/AbertaBackOffice.bundle.scp.css"
+    },
+    {
+      "Id": "/home/vil/repos/Aberta/AbertaBackOffice/src/Aberta.BackOffice/wwwroot/app.css",
+      "PackagePath": "staticwebassets/app.css"
+    },
+    {
+      "Id": "/home/vil/repos/Aberta/AbertaBackOffice/src/Aberta.BackOffice/wwwroot/bootstrap/bootstrap.min.css",
+      "PackagePath": "staticwebassets/bootstrap/bootstrap.min.css"
+    },
+    {
+      "Id": "/home/vil/repos/Aberta/AbertaBackOffice/src/Aberta.BackOffice/wwwroot/bootstrap/bootstrap.min.css.map",
+      "PackagePath": "staticwebassets/bootstrap/bootstrap.min.css.map"
+    },
+    {
+      "Id": "/home/vil/repos/Aberta/AbertaBackOffice/src/Aberta.BackOffice/wwwroot/favicon.png",
+      "PackagePath": "staticwebassets/favicon.png"
+    },
+    {
+      "Id": "/home/vil/repos/Aberta/AbertaBackOffice/src/Aberta.BackOffice/wwwroot/la.png",
+      "PackagePath": "staticwebassets/la.png"
+    },
+    {
+      "Id": "/home/vil/repos/Aberta/AbertaBackOffice/src/Aberta.BackOffice/wwwroot/notfound.jpg",
+      "PackagePath": "staticwebassets/notfound.jpg"
+    },
+    {
+      "Id": "obj/Debug/net8.0/staticwebassets/msbuild.AbertaBackOffice.Microsoft.AspNetCore.StaticWebAssets.props",
+      "PackagePath": "build\\Microsoft.AspNetCore.StaticWebAssets.props"
+    },
+    {
+      "Id": "obj/Debug/net8.0/staticwebassets/msbuild.build.AbertaBackOffice.props",
+      "PackagePath": "build\\AbertaBackOffice.props"
+    },
+    {
+      "Id": "obj/Debug/net8.0/staticwebassets/msbuild.buildMultiTargeting.AbertaBackOffice.props",
+      "PackagePath": "buildMultiTargeting\\AbertaBackOffice.props"
+    },
+    {
+      "Id": "obj/Debug/net8.0/staticwebassets/msbuild.buildTransitive.AbertaBackOffice.props",
+      "PackagePath": "buildTransitive\\AbertaBackOffice.props"
+    }
+  ],
+  "ElementsToRemove": []
+}
