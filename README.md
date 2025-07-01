@@ -52,5 +52,3 @@ That should be all for the project to be up, just open your browser and check th
 \
 Hangfire (Scanner project) can be found at http://localhost:8083/hangfire and the API can be reached at http://localhost:8081.
 
-The documentation of this project can be found [\[here\]](https://github.com/VilMano/livrariaaberta.pt/wiki).
-
