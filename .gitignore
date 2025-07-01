@@ -16,7 +16,7 @@ AbertaAPI/src/Aberta.API/appsettings.Development.json
 # BackOffice
 
 AbertaBackOffice/src/.idea
-AbertaBackOffice/AbertaBackOffice.sln.DotSettings.user
+AbertaBackOffice/src/Aberta.BackOffice.sln.DotSettings.user
 
 AbertaBackOffice/src/Aberta.BackOffice/appsettings.Development.json
 
