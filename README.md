@@ -26,10 +26,7 @@ scheduled jobs to update stock from the VendusAPI.
 ![Image](https://github.com/VilMano/livrariaaberta.pt/blob/main/Untitled%20Diagram.jpg?raw=true)
 
 ### <ins>**Prerequisites**</ins>
-To run this project in its fullest, you must install a few things.
- * Docker
- * .NET sdk 8.0 tools
- * git
+To run this project in its fullest, you must install <b>Docker</b>.
 
 
 
@@ -41,21 +38,19 @@ First of all, clone the project
     $ cd livrariaaberta.pt
 
 Now you are presented with three folders (BackOffice, API, Scanner). 
-Let's start by running the API project which contains the database and API.
+Edit the appsettings.json files and run:
 
 Warning: Edit the appsettings.cs file before running the container.
 
-    $ cd API
     $ docker compose up -d
 
-That should be all for the project to be up, just open your browser and check the API endpoint (Swagger):
+That should be all for the project to be up, just open your browser and check the BackOffice frontend:
 
-    http://localhost:{port}/swagger/index.html
+    http://localhost:8082/
 
 
 \
-The process will be the same for the Scanner and BackOffice projects.
-Hangfire (Scanner project) can be found at http://localhost:{port}/hangfire and the BackOffice can be reached at http://localhost:{port}.
+Hangfire (Scanner project) can be found at http://localhost:8083/hangfire and the API can be reached at http://localhost:8081.
 
 The documentation of this project can be found [\[here\]](https://github.com/VilMano/livrariaaberta.pt/wiki).
 
