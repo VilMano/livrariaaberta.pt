@@ -5,41 +5,46 @@ services:
     environment:
       - MARIADB_ROOT_PASSWORD=${MARIADB_ROOT_PASSWORD}
     volumes:
-      - ${VILHOME}/Aberta/Test/Aberta.API/db/initdb.d/:/docker-entrypoint-initdb.d/
+      - ./API/db/initdb.d/:/docker-entrypoint-initdb.d/
     ports:
       - "${MARIADB_PORT}:3306"
     restart: 'unless-stopped'
   api:
     container_name: Aberta.API
     build:
-      context: ./Aberta/Test/Aberta.API/.
+      context: ./API/.
     ports:
       - 8081:8080
     volumes:
-      - ${VILHOME}/Aberta/Test/Aberta.API/wwwroot:/App/wwwroot
-      - ${VILHOME}/Aberta/Test/Aberta.API/Logs:/App/Logs
-      - ${VILHOME}/Aberta/Test/Aberta.API/Keys:/root/.aspnet/DataProtection-Keys
+      - ./API/wwwroot:/App/wwwroot
+      - ./API/Logs:/App/Logs
+      - ./API/Keys:/root/.aspnet/DataProtection-Keys
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
     restart: 'unless-stopped'
   scanner:
     container_name: Aberta.Scanner
     build:
-      context: ${VILHOME}/Aberta/Test/Aberta.Scanner/.
+      context: ./Scanner/.
     volumes:
-      - ${VILHOME}/Aberta/Test/Aberta.Scanner/Logs:/App/Logs
+      - ./Scanner/Logs:/App/Logs
+      - ./Scanner/Keys:/root/.aspnet/DataProtection-Keys
     ports:
       - 8083:8080
     depends_on:
-      - hangfire
+      - db
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
     restart: 'unless-stopped'
   backoffice:
     container_name: Aberta.BackOffice
     build:
-      context: ${VILHOME}/Aberta/Test/Aberta.BackOffice/.
+      context: ./BackOffice/.
     ports:
       - 8082:8080
     volumes:
-      - ${VILHOME}/Aberta/Test/Aberta.BackOffice/db:/App/Data
-      - ${VILHOME}/Aberta/Test/Aberta.BackOffice/Keys:/root/.aspnet/DataProtection-Keys
+      - ./BackOffice/db:/App/Data
+      - ./BackOffice/Keys:/root/.aspnet/DataProtection-Keys
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
     restart: 'unless-stopped'

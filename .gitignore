@@ -4,32 +4,32 @@ exclude/
 # ------------
 # API
 
-AbertaAPI/src/Aberta.Tests
-AbertaAPI/src/AbertaAPI.sln.DotSettings.user
-AbertaAPI/src/.idea
-AbertaAPI/src/Aberta.API/bin
-AbertaAPI/src/Aberta.API/obj
-AbertaAPI/src/Aberta.API/appsettings.Development.json
+API/src/Aberta.Tests
+API/src/AbertaAPI.sln.DotSettings.user
+API/src/.idea
+API/src/Aberta.API/bin
+API/src/Aberta.API/obj
+API/src/Aberta.API/appsettings.Development.json
 
 
 # ------------
 # BackOffice
 
-AbertaBackOffice/src/.idea
-AbertaBackOffice/src/Aberta.BackOffice.sln.DotSettings.user
+BackOffice/src/.idea
+BackOffice/src/Aberta.BackOffice.sln.DotSettings.user
 
-AbertaBackOffice/src/Aberta.BackOffice/appsettings.Development.json
+BackOffice/src/Aberta.BackOffice/appsettings.Development.json
 
-AbertaBackOffice/src/Aberta.BackOffice/bin
-AbertaBackOffice/src/Aberta.BackOffice/obj
+BackOffice/src/Aberta.BackOffice/bin
+BackOffice/src/Aberta.BackOffice/obj
 
 
 # ------------
 # Scanner
 
-AbertaScanner/src/.idea
-AbertaScanner/src/Aberta.Scanner/bin
+Scanner/src/.idea
+Scanner/src/Aberta.Scanner/bin
 
-AbertaScanner/src/Aberta.Scanner/obj
+Scanner/src/Aberta.Scanner/obj
 
-AbertaScanner/src/Aberta.Scanner/appsettings.Development.json
+Scanner/src/Aberta.Scanner/appsettings.Development.json
