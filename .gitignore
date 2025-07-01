@@ -1,2 +1,35 @@
 update_project.sh
 exclude/
+
+# ------------
+# API
+
+AbertaAPI/src/Aberta.Tests
+AbertaAPI/src/AbertaAPI.sln.DotSettings.user
+AbertaAPI/src/.idea
+AbertaAPI/src/Aberta.API/bin
+AbertaAPI/src/Aberta.API/obj
+AbertaAPI/src/Aberta.API/appsettings.Development.json
+
+
+# ------------
+# BackOffice
+
+AbertaBackOffice/src/.idea
+AbertaBackOffice/AbertaBackOffice.sln.DotSettings.user
+
+AbertaBackOffice/src/Aberta.BackOffice/appsettings.Development.json
+
+AbertaBackOffice/src/Aberta.BackOffice/bin
+AbertaBackOffice/src/Aberta.BackOffice/obj
+
+
+# ------------
+# Scanner
+
+AbertaScanner/src/.idea
+AbertaScanner/src/Aberta.Scanner/bin
+
+AbertaScanner/src/Aberta.Scanner/obj
+
+AbertaScanner/src/Aberta.Scanner/appsettings.Development.json
